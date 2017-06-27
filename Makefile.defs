@@ -1,0 +1,14 @@
+PROJ_SOURCES = \
+	src/raythrucells.c
+
+TEST_SOURCES = \
+	test/test.c\
+	test/icosahedron.c
+
+PROJ_INCLUDES = \
+	src/raythrucells.h
+
+TEST_INCLUDES = \
+	test/test.h\
+	test/dims.h
+
