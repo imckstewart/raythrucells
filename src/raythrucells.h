@@ -8,8 +8,6 @@
 
 #include "dims.h" /* Should define the macro N_DIMS which specifies the number of spatial dimensions. Note that this is a _maximum_ value, the actual value 'numDims' which is passed via the function interfaces may be <= N_DIMS. */
 
-#define RTC_BUFFER_SIZE		1024
-
 /* Error codes:
 */
 #define RTC_ERR_SVD_FAIL	0
@@ -19,16 +17,35 @@
 #define RTC_ERR_TOO_MANY_ENTRY	4
 #define RTC_ERR_BUG		5
 #define RTC_ERR_OLD_NOT_FOUND	6
-#define RTC_ERR_NO_ENTRIES	7
-#define RTC_ERR_BAD_CHAIN	8
+#define RTC_ERR_BAD_CHAIN	7
+
+
+#define RTC_MSG_STR_LEN		80
+#define RTC_BUFFER_SIZE		1024
+
+#ifndef TRUE
+#define TRUE                   (_Bool)1
+#endif
+
+#ifndef FALSE
+#define FALSE                  (_Bool)0
+#endif
 
 /* In the following comments, N is short for N_DIMS, the number of spatial dimensions. */
+
+/* The following is just a convenience struct to contain a bunch of stuff which are passed very often together to functions in the 2nd-order interpolation routines. It should be initialized in initializeBaryBuf().
+*/
+typedef struct  {
+  unsigned long id;
+  unsigned long vertices[2]; /* these are interpreted as in index to any list of vertex quantities supplied. */
+} edgeType;
 
 /* NOTE that it is assumed that vertx[i] is opposite the face that abuts with neigh[i] for all i.
 */ 
 struct simplex {
   unsigned long id;
-  unsigned long vertx[N_DIMS+1];
+  unsigned long vertx[N_DIMS+1]; /* this is interpreted as in index to any list of vertex quantities supplied. */
+  unsigned long edges[N_DIMS*(N_DIMS+1)/2]; /* this is interpreted as in index to any list of edgeType structs supplied. */
   double centre[N_DIMS];
   struct simplex *neigh[N_DIMS+1]; /* An entry ==NULL flags an external face. */
 };
@@ -37,13 +54,13 @@ struct simplex {
 */
 typedef struct {
   int fi;
-  /* The index (in the range {0...N}) of the face (and thus of the opposite vertex, i.e. the one 'missing' from the bary[] list of this face).
+  /* The index (in the range {0...N}) of the face (and thus of the opposite vertex, i.e. the one 'missing' from the bary[] list of this face). This index should key to members .vertx and .neigh of struct simplex.
   */
   int orientation;
   /* >0 means the ray exits, <0 means it enters, ==0 means the face is parallel to ray.
   */
   double bary[N_DIMS], dist, collPar;
-  /* 'dist' is defined via r_int = r + dist*dir. 'collPar' is a measure of how close to any edge of the face r_int lies.
+  /* These are the barycentric coordinates of the point of intersection between the ray and the face 'fi' of the simplex. The quantity 'dist' is defined via r_int = r + dist*dir. 'collPar' is a measure of how close r_int lies to any edge of the face. Note that the ordering of the indices of .bary is the same as the ordering for .vertx and .neigh of the simplex it belongs to, only with the vertex corresponding to the intersected face missing.
   */
 } intersectType;
 
@@ -57,10 +74,8 @@ typedef struct {
   /* 'r' expresses the location of the N vertices of a simplicial polytope face in N-space, in terms of components along the N-1 orthogonal axes in the sub-plane of the face. Thus you should malloc r as r[N][N-1]. */
 } facePlusBasisType;
 
-typedef struct{
-  faceType *faces,*(*facePtrs[N_DIMS+1]);
-} faceListType;
 
+faceType extractFace(const int numDims, double *vertexCoords, struct simplex *dc, const unsigned long dci, const int fi);
 int	followRayThroughCells(const int numDims, double *x, double *dir\
   , struct simplex *dc, const unsigned long numCells, const double epsilon\
   , faceType **facePtrs[N_DIMS+1], double *vertexCoords\

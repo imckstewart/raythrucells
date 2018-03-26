@@ -1,5 +1,5 @@
 # Names of source files included:
-include Makefile.defs
+include Makefile.srcs
 
 LIBS += -L/usr/local/lib
 CPPFLAGS = -I. -I./test
@@ -7,7 +7,8 @@ CPPFLAGS = -I. -I./test
 CC=gcc -g
 
 CCFLAGS = -DTEST
-LDFLAGS=-lm -lgsl -lgslcblas -lcpgplot
+CCFLAGS += -I/usr/include/cfitsio
+LDFLAGS=-lm -lgsl -lgslcblas -lcfitsio -lcpgplot
 
 SRCS = ${PROJ_SOURCES} ${TEST_SOURCES}
 INCS = ${PROJ_INCLUDES} ${TEST_INCLUDES}
@@ -24,5 +25,5 @@ mytest: ${OBJS}
 .PHONY: clean
 
 clean:
-	rm -f src/*.o test/*.o *~ src/*~ test/*~ core mytest
+	rm -f src/*.o test/*.o *~ src/*~ test/*~ core mytest ./junk*
 

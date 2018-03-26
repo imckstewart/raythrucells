@@ -25,7 +25,7 @@ _initializeIntersect(const int numDims){
 
 /*....................................................................*/
 faceType
-_extractFace(const int numDims, double *vertexCoords, struct simplex *cells\
+extractFace(const int numDims, double *vertexCoords, struct simplex *cells\
   , const unsigned long dci, const int fi){
   /* Given a simplex cells[dci] and the face index (in the range {0...numDims}) fi, this returns the desired information about that face. Note that the ordering of the elements of face.r[] is the same as the ordering of the vertices of the simplex, cells[dci].vertx[]; just the vertex fi is omitted.
 
@@ -154,8 +154,93 @@ Note that numVertices (a.k.a. M) is expected to be >= numDims (a.k.a. N). The th
 }
 
 /*....................................................................*/
+void
+_calcBaryCoords(const int numDims, double vertices[N_DIMS][N_DIMS-1], double *x, double *bary){
+  /*
+In an N-dimensional space, the final N barycentric coordinates L_ = {L_1,L_2,...,L_N} of a point x_ inside a simplex with vertices r_0_ to r_N_ are given by
+
+	T L_ = x_ - r_0_
+
+where T is an N*N matrix with entries
+
+	T_{i,j} = r_j+1[i] - r_0[i].
+
+
+The 0th barycentric coordinate, L_0, is given by
+
+	         __N
+	         \
+	L_0 = 1 - >    L_i.
+	         /_i=1
+
+See the Wikipedia article on barycentric coordinates for further information.
+
+The pointer x must be malloc'd to >= sizeof(*x)*numDims and bary must be malloc'd to >= sizeof(*bary)*(numDims+1).
+  */
+  int i,j;
+  double tMat[numDims][numDims],bVec[numDims],det;
+  char errStr[RTC_MSG_STR_LEN];
+
+  if(numDims==1 || numDims==2){
+    for(i=0;i<numDims;i++){
+      for(j=0;j<numDims;j++)
+        tMat[i][j] = vertices[j+1][i] - vertices[0][i];
+      bVec[i] = x[i] - vertices[0][i];
+    }
+
+    if(numDims==1)
+      bary[1] = bVec[0]/tMat[0][0];
+
+    else{ /* numDims==2 */
+      det = tMat[0][0]*tMat[1][1] - tMat[0][1]*tMat[1][0];
+      /*** We're assuming that the simplex (a triangle in the present case) is not pathological, i.e that det!=0. */
+      bary[1] = ( tMat[1][1]*bVec[0] - tMat[0][1]*bVec[1])/det;
+      bary[2] = (-tMat[1][0]*bVec[0] + tMat[0][0]*bVec[1])/det;
+    }
+
+  }else{ /* Assume numDims>2 */
+    int dummySignum,status=0;
+    gsl_matrix *gslT = gsl_matrix_alloc(numDims-1, numDims-1);
+    gsl_vector *gsl_x = gsl_vector_alloc(numDims-1);
+    gsl_vector *gsl_b = gsl_vector_alloc(numDims-1);
+    gsl_permutation *p = gsl_permutation_alloc(numDims-1);
+
+    for(i=0;i<numDims;i++){
+      for(j=0;j<numDims;j++)
+        gsl_matrix_set(gslT, i, j, vertices[j+1][i] - vertices[0][i]);
+      gsl_vector_set(gsl_b, i, x[i] - vertices[0][i]);
+    }
+
+    status = gsl_linalg_LU_decomp(gslT,p,&dummySignum);
+    if(status){
+      snprintf(errStr, RTC_MSG_STR_LEN, "LU decomposition failed (GSL error %d).", status);
+      rtcError(RTC_ERR_LU_DECOMP_FAIL, errStr);
+    }
+
+    status = gsl_linalg_LU_solve(gslT,p,gsl_b,gsl_x);
+    if(status){
+      snprintf(errStr, RTC_MSG_STR_LEN, "LU solver failed (GSL error %d).", status);
+      rtcError(RTC_ERR_LU_SOLVE_FAIL, errStr);
+    }
+
+    for(i=0;i<numDims;i++)
+      bary[i+1] = gsl_vector_get(gsl_x,i);
+
+    gsl_permutation_free(p);
+    gsl_vector_free(gsl_b);
+    gsl_vector_free(gsl_x);
+    gsl_matrix_free(gslT);
+  }
+
+  bary[0] = 1.0;
+  for(i=1;i<numDims+1;i++)
+    bary[0] -= bary[i];
+}
+
+/*....................................................................*/
 intersectType
-_intersectLineWithFace(const int numDims, double *x, double *dir, faceType *face, const double epsilon){
+_intersectLineWithFace(const int numDims, double *x, double *dir, faceType *face\
+  , const double epsilon){
   /*
 This function calculates the intersection between a line and the face of a simplex oriented in that space. Obviously the number of dimensions of the space must be >=2. The intersection point may be expressed as
 
@@ -189,7 +274,7 @@ Notes:
   int i,j,k,di,ci,ri,vi,ciOfMax,ciOfMin;
   double testSumForCW=0.0,maxSingularValue,singularValue;
   facePlusBasisType facePlusBasis;
-  char errStr[80];
+  char errStr[RTC_MSG_STR_LEN];
   intersectType intcpt;
 
   for(vi=0;vi<numDims-1;vi++){
@@ -226,7 +311,7 @@ Notes:
 
     status = gsl_linalg_SV_decomp(matrix, svv, svs, work);
     if(status){
-      sprintf(errStr, "SVD decomposition failed (GSL error %d).", status);
+      snprintf(errStr, RTC_MSG_STR_LEN, "SVD decomposition failed (GSL error %d).", status);
       rtcError(RTC_ERR_SVD_FAIL, errStr);
     }
 
@@ -255,7 +340,7 @@ The GSL doco says that SV_decomp returns sorted svs values, but I prefer not to 
       if(singularValue*oneOnEpsilon<maxSingularValue){
         if(ciOfMin>=0){
           /* This is an error because it indicates that >1 singular values are 'small'. */
-          sprintf(errStr, "Simplex face does not span an N-1 subspace.");
+          snprintf(errStr, RTC_MSG_STR_LEN, "Simplex face does not span an N-1 subspace.");
           rtcError(RTC_ERR_NON_SPAN, errStr);
         }
 
@@ -343,60 +428,7 @@ The final BC L_0 is given by
 	         /_i=1
   */
 
-  if(numDims==2 || numDims==3){
-    for(i=0;i<numDims-1;i++){
-      for(j=0;j<numDims-1;j++)
-        tMat[i][j] = facePlusBasis.r[j+1][i] - facePlusBasis.r[0][i];
-      bVec[i] = pxInFace[i] - facePlusBasis.r[0][i];
-    }
-
-    if(numDims==2)
-      intcpt.bary[1] = bVec[0]/tMat[0][0];
-
-    else{ /* numDims==3 */
-      det = tMat[0][0]*tMat[1][1] - tMat[0][1]*tMat[1][0];
-      /*** We're assuming that the triangle is not pathological, i.e that det!=0. */
-      intcpt.bary[1] = ( tMat[1][1]*bVec[0] - tMat[0][1]*bVec[1])/det;
-      intcpt.bary[2] = (-tMat[1][0]*bVec[0] + tMat[0][0]*bVec[1])/det;
-    }
-
-  }else{ /* Assume numDims>3 */
-    int dummySignum,status=0;
-    gsl_matrix *gslT = gsl_matrix_alloc(numDims-1, numDims-1);
-    gsl_vector *gsl_x = gsl_vector_alloc(numDims-1);
-    gsl_vector *gsl_b = gsl_vector_alloc(numDims-1);
-    gsl_permutation *p = gsl_permutation_alloc(numDims-1);
-
-    for(i=0;i<numDims-1;i++){
-      for(j=0;j<numDims-1;j++)
-        gsl_matrix_set(gslT, i, j, facePlusBasis.r[j+1][i] - facePlusBasis.r[0][i]);
-      gsl_vector_set(gsl_b, i, pxInFace[i] - facePlusBasis.r[0][i]);
-    }
-
-    status = gsl_linalg_LU_decomp(gslT,p,&dummySignum);
-    if(status){
-      sprintf(errStr, "LU decomposition failed (GSL error %d).", status);
-      rtcError(RTC_ERR_LU_DECOMP_FAIL, errStr);
-    }
-
-    status = gsl_linalg_LU_solve(gslT,p,gsl_b,gsl_x);
-    if(status){
-      sprintf(errStr, "LU solver failed (GSL error %d).", status);
-      rtcError(RTC_ERR_LU_SOLVE_FAIL, errStr);
-    }
-
-    for(i=0;i<numDims-1;i++)
-      intcpt.bary[i+1] = gsl_vector_get(gsl_x,i);
-
-    gsl_permutation_free(p);
-    gsl_vector_free(gsl_b);
-    gsl_vector_free(gsl_x);
-    gsl_matrix_free(gslT);
-  }
-
-  intcpt.bary[0] = 1.0;
-  for(i=1;i<numDims;i++)
-    intcpt.bary[0] -= intcpt.bary[i];
+  _calcBaryCoords(numDims-1, facePlusBasis.r, pxInFace, intcpt.bary);
 
   /* Finally, calculate the 'collision parameter':
   */
@@ -424,7 +456,7 @@ int
 _buildRayCellChain(const int numDims, double *x, double *dir\
   , struct simplex *cells, _Bool **cellVisited, unsigned long dci\
   , int entryFaceI, int levelI, int nCellsInChain, const double epsilon\
-  , faceType **facePtrs[numDims+1], double *vertexCoords\
+  , faceType **facePtrs[N_DIMS+1], double *vertexCoords\
   , unsigned long **chainOfCellIds, intersectType **cellExitIntcpts\
   , int *lenChainPtrs){
   /*
@@ -451,7 +483,7 @@ The function terminates under the following conditions:
 
 At a successful termination, therefore, details of all the cells to the edge of the model are correctly stored in chainOfCellIds and cellExitIntcpts, and the number of these cells is returned in lenChainPtrs.
 
-***** Note that it is assumed here that a mis-indentification of the actual cell traversed by a ray will not ultimately matter to the external calling routine. This is only reasonable if whatever function or property is being sampled by the ray does not vary in a stepwise manner at any cell boundary. *****
+***** Note that it is assumed here that a mis-indentification of the actual cell traversed by a ray in marginal cases will not ultimately matter to the external calling routine. This is only reasonable if whatever function or property is being sampled by the ray does not vary in a stepwise manner at any cell boundary. *****
   */
 
   const int numFaces=numDims+1;
@@ -481,7 +513,7 @@ At a successful termination, therefore, details of all the cells to the edge of 
       if(fi!=entryFaceI && (cells[dci].neigh[fi]==NULL || !(*cellVisited)[cells[dci].neigh[fi]->id])){
         /* Store points for this face: */
         if(facePtrs==NULL){
-          face = _extractFace(numDims, vertexCoords, cells, dci, fi);
+          face = extractFace(numDims, vertexCoords, cells, dci, fi);
         }else{
           face = (*facePtrs)[dci][fi];
         }
@@ -571,14 +603,14 @@ At a successful termination, therefore, details of all the cells to the edge of 
 int
 followRayThroughCells(const int numDims, double *x, double *dir\
   , struct simplex *cells, const unsigned long numCells, const double epsilon\
-  , faceType **facePtrs[numDims+1], double *vertexCoords\
+  , faceType **facePtrs[N_DIMS+1], double *vertexCoords\
   , intersectType *entryIntcpt, unsigned long **chainOfCellIds\
   , intersectType **cellExitIntcpts, int *lenChainPtrs){
   /*
 The present function follows a ray through a connected, convex set of cells (assumed to be simplices) and returns information about the chain of cells it passes through. If the ray is found to pass through 1 or more cells, the function returns 0, indicating success; if not, it returns a non-zero value. The chain description consists of three pieces of information: (i) intercept information for the entry face of the first cell encountered; (ii) the IDs of the cells in the chain; (iii) intercept information for the exit face of the ith cell.
 
 The function arguments:
------------------------
+=======================
     Inputs:
     -------
 	numDims: the number of spatial dimensions. Note that this may be <= N_DIM.
@@ -607,7 +639,7 @@ The function arguments:
 
 
 Notes:
-------
+======
 The pointers *chainOfCellIds and *cellExitIntcpts should be freed after the function is called.
 
 The argument facePtrs may be set to NULL, in which case the function will construct each face from the list of cells etc as it needs it. This saves on memory but takes more time. If the calling routine supplies these values it needs to do something like as follows:
@@ -648,7 +680,7 @@ and filled as
       if(cells[dci].neigh[fi]==NULL){ /* means that this face lies on the outside of the model. */
         /* Store points for this face: */
         if(facePtrs==NULL){
-          face = _extractFace(numDims, vertexCoords, cells, dci, fi);
+          face = extractFace(numDims, vertexCoords, cells, dci, fi);
         }else{
           face = (*facePtrs)[dci][fi];
         }
@@ -679,10 +711,10 @@ and filled as
     *chainOfCellIds=NULL;
     *cellExitIntcpts=NULL;
 
-    return RTC_ERR_NO_ENTRIES;
+    return 0; /* This is ok, it can happen if the ray missed the mesh of cells entirely. */
   }
 
-  *lenChainPtrs = RTC_BUFFER_SIZE; /* This can be increased within followCellChain(). */
+  *lenChainPtrs = RTC_BUFFER_SIZE; /* This can be increased within _buildRayCellChain(). */
   *chainOfCellIds  = malloc(sizeof(**chainOfCellIds) *(*lenChainPtrs));
   *cellExitIntcpts = malloc(sizeof(**cellExitIntcpts)*(*lenChainPtrs));
   cellVisited = malloc(sizeof(*cellVisited)*numCells);
@@ -697,11 +729,11 @@ and filled as
     if(status==0) break;
   }
 
-  if(status==0){ /* means none of the possibly >1 entry faces returned a good chain. */
-    *entryIntcpt = entryIntcpts[i-1];
+  if(status==0){ /* means ith entry face returned a good chain. */
+    *entryIntcpt = entryIntcpts[i];
     /* Note that the order of the bary coords, and the value of fi, are with reference to the vertx list of the _entered_ cell. This can't of course be any other way, because this ray enters this first cell from the exterior of the model, where there are no cells. For all the intersectType objects in the list cellExitIntcpts, the bary coords etc are with reference to the exited cell. */
 
-  }else{ /* return with status value from last bad chain. */
+  }else{ /* means none of the possibly >1 entry faces returned a good chain. Return with status value from last bad chain. */
     *entryIntcpt = _initializeIntersect(numDims);
     free(*chainOfCellIds);
     *chainOfCellIds=NULL;
