@@ -4,7 +4,7 @@ include Makefile.srcs
 LIBS += -L/usr/local/lib
 CPPFLAGS = -I. -I./test
 
-CC=gcc -g
+CC=gcc -g -Wall
 
 CCFLAGS = -DTEST
 CCFLAGS += -I/usr/include/cfitsio

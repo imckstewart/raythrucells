@@ -10,7 +10,6 @@
 #include "../src/meshtocube.h"
 #include "icosahedron.h"
 #include "dissected_cube.h"
-#include "rt_utils.h"
 
 
 void project(const int);

@@ -1,5 +1,6 @@
 PROJ_SOURCES = \
 	src/raythrucells.c\
+	src/rt_utils.c\
 	src/meshtocube.c
 
 TEST_SOURCES = \
@@ -7,17 +8,16 @@ TEST_SOURCES = \
 	test/testfunc.c\
 	test/icosahedron.c\
 	test/write_fits.c\
-	test/dissected_cube.c\
-	test/rt_utils.c
+	test/dissected_cube.c
 
 PROJ_INCLUDES = \
 	src/dims.h\
 	src/raythrucells.h\
+	src/rt_utils.h\
 	src/meshtocube.h
 
 TEST_INCLUDES = \
 	test/test.h\
 	test/icosahedron.h\
-	test/dissected_cube.h\
-	test/rt_utils.h
+	test/dissected_cube.h
 

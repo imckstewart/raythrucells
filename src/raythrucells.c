@@ -155,7 +155,8 @@ Note that numVertices (a.k.a. M) is expected to be >= numDims (a.k.a. N). The th
 
 /*....................................................................*/
 void
-_calcBaryCoords(const int numDims, double vertices[N_DIMS][N_DIMS-1], double *x, double *bary){
+_calcBaryCoords(const int numDims, double vertices[N_DIMS][N_DIMS-1]\
+  , double *x, double *bary){
   /*
 In an N-dimensional space, the final N barycentric coordinates L_ = {L_1,L_2,...,L_N} of a point x_ inside a simplex with vertices r_0_ to r_N_ are given by
 
@@ -270,7 +271,7 @@ Notes:
 	* There is, of course, no guarantee that the line actually intersects the face, even if the line and the face are non-parallel. There are also borderline cases, i.e. where the line passes close to a vertex, in which an exact calculation would show that the intersection occurs (or doesn't occur), but the imprecise computed value claims that it doesn't (or does). Intersection may be judged via the values of the barycentric coordinates (BC): if the BC all fall in the interval [0,1], the line intersects the face; if one of the BC is negative, it doesn't.
   */
   const double oneOnEpsilon=1.0/epsilon;
-  double vs[numDims-1][numDims],norm[numDims],normDotDx, numerator, pxInFace[numDims-1], tMat[numDims-1][numDims-1], bVec[numDims-1], det;
+  double vs[numDims-1][numDims],norm[numDims],normDotDx,numerator,pxInFace[numDims-1];
   int i,j,k,di,ci,ri,vi,ciOfMax,ciOfMin;
   double testSumForCW=0.0,maxSingularValue,singularValue;
   facePlusBasisType facePlusBasis;

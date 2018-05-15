@@ -152,7 +152,7 @@ Each cell (i.e. each simplex) has an ID integer. The IDs of the cells which the 
       rasterValues[xi*numElementsPerVertex+ei]\
         =        fracDist *faceValues[  faceToggleI][ei]\
         + (1.0 - fracDist)*faceValues[1-faceToggleI][ei];
-    /* Note that at this point faceValues[faceToggleI] should be the exit-face values and the others the entry-face values. */
+    /* Note that at this point faceValues[faceToggleI] should be the exit-face values and faceValues[1-faceToggleI] the entry-face values. */
   }
 }
 
@@ -257,7 +257,7 @@ Below is a code snippet showing an example of how to call this function:
   - midEdgeValues: >=M*numElementsPerVertex, where M is the total number of edges (the maximum value of cell->edges for all cells).
   */
 
-  int status=0,di,subPlanePxi[numDims-1],adi,rtcStatus=0,lenChainPtrs=0,xi,ei,i;
+  int status=0,di,subPlanePxi[numDims-1],rtcStatus=0,lenChainPtrs=0,xi,ei;
   unsigned long numPointsInCube,ppi,subPlanePpi;
   double rayOrigin[numDims],rayDir[numDims],*rasterValues=NULL;
   intersectType entryIntcptFirstCell,*cellExitIntcpts=NULL;

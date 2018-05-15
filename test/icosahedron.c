@@ -3,14 +3,13 @@ This generates a mesh of 20 connected tetrahedral cells inside the hull of a reg
 */
 
 #include "icosahedron.h"
-#include "rt_utils.h"
 
 typedef struct {
   int vertices[4],shortAxisI,longAxisI,zeroAxisI;
 } goldenRectangle;
 
 /*....................................................................*/
-void icosahedronVertices(double **vertexCoords, unsigned long *numPoints){
+int icosahedronVertices(double **vertexCoords, unsigned long *numPoints){
   /*
 The calling routine should free *vertexCoords after use.
 
@@ -97,16 +96,130 @@ Here we cycle through the 3 rectangles and load in the coordinates to the releva
   for(i=0;i<numDims;i++){
     (*vertexCoords)[numDims*vi + i] = 0.0;
   }
+
+return numDims;
 }
 
 /*....................................................................*/
-void icosahedronCells(double *vertexCoords, struct simplex **cells, unsigned long *numCells){
+int icosahedronGrid(struct gridPoint **gridPoints, unsigned long *numPoints){
+  const int numDims=3; /* Not actually needed within the routine, just returned. */
+  int i,j;
+
+  *numPoints = 13;
+  *gridPoints = malloc(sizeof(**gridPoints)*(*numPoints));
+  for(i=0;i<*numPoints;i++){
+    (*gridPoints)[i].id = i;
+
+    if(i==*numPoints-1)
+      (*gridPoints)[i].numNeigh = 12;
+    else
+      (*gridPoints)[i].numNeigh = 6;
+
+    (*gridPoints)[i].neigh = malloc(sizeof(struct gridPoint *)*(*gridPoints)[i].numNeigh);
+
+    if(i<*numPoints-1)
+      (*gridPoints)[i].neigh[(*gridPoints)[i].numNeigh-1] = &(*gridPoints)[*numPoints-1];
+  }
+
+  i = 0;
+  (*gridPoints)[i].neigh[0] = &(*gridPoints)[ 2];
+  (*gridPoints)[i].neigh[1] = &(*gridPoints)[10];
+  (*gridPoints)[i].neigh[2] = &(*gridPoints)[ 6];
+  (*gridPoints)[i].neigh[3] = &(*gridPoints)[ 4];
+  (*gridPoints)[i].neigh[4] = &(*gridPoints)[ 8];
+
+  i = 1;
+  (*gridPoints)[i].neigh[0] = &(*gridPoints)[ 3];
+  (*gridPoints)[i].neigh[1] = &(*gridPoints)[ 9];
+  (*gridPoints)[i].neigh[2] = &(*gridPoints)[ 4];
+  (*gridPoints)[i].neigh[3] = &(*gridPoints)[ 6];
+  (*gridPoints)[i].neigh[4] = &(*gridPoints)[11];
+
+  i = 2;
+  (*gridPoints)[i].neigh[0] = &(*gridPoints)[ 0];
+  (*gridPoints)[i].neigh[1] = &(*gridPoints)[ 8];
+  (*gridPoints)[i].neigh[2] = &(*gridPoints)[ 5];
+  (*gridPoints)[i].neigh[3] = &(*gridPoints)[ 7];
+  (*gridPoints)[i].neigh[4] = &(*gridPoints)[10];
+
+  i = 3;
+  (*gridPoints)[i].neigh[0] = &(*gridPoints)[ 1];
+  (*gridPoints)[i].neigh[1] = &(*gridPoints)[11];
+  (*gridPoints)[i].neigh[2] = &(*gridPoints)[ 7];
+  (*gridPoints)[i].neigh[3] = &(*gridPoints)[ 5];
+  (*gridPoints)[i].neigh[4] = &(*gridPoints)[ 9];
+
+  i = 4;
+  (*gridPoints)[i].neigh[0] = &(*gridPoints)[ 0];
+  (*gridPoints)[i].neigh[1] = &(*gridPoints)[ 6];
+  (*gridPoints)[i].neigh[2] = &(*gridPoints)[ 1];
+  (*gridPoints)[i].neigh[3] = &(*gridPoints)[ 9];
+  (*gridPoints)[i].neigh[4] = &(*gridPoints)[ 8];
+
+  i = 5;
+  (*gridPoints)[i].neigh[0] = &(*gridPoints)[ 2];
+  (*gridPoints)[i].neigh[1] = &(*gridPoints)[ 8];
+  (*gridPoints)[i].neigh[2] = &(*gridPoints)[ 9];
+  (*gridPoints)[i].neigh[3] = &(*gridPoints)[ 3];
+  (*gridPoints)[i].neigh[4] = &(*gridPoints)[ 7];
+
+  i = 6;
+  (*gridPoints)[i].neigh[0] = &(*gridPoints)[ 0];
+  (*gridPoints)[i].neigh[1] = &(*gridPoints)[10];
+  (*gridPoints)[i].neigh[2] = &(*gridPoints)[11];
+  (*gridPoints)[i].neigh[3] = &(*gridPoints)[ 1];
+  (*gridPoints)[i].neigh[4] = &(*gridPoints)[ 4];
+
+  i = 7;
+  (*gridPoints)[i].neigh[0] = &(*gridPoints)[ 2];
+  (*gridPoints)[i].neigh[1] = &(*gridPoints)[ 5];
+  (*gridPoints)[i].neigh[2] = &(*gridPoints)[ 3];
+  (*gridPoints)[i].neigh[3] = &(*gridPoints)[11];
+  (*gridPoints)[i].neigh[4] = &(*gridPoints)[10];
+
+  i = 8;
+  (*gridPoints)[i].neigh[0] = &(*gridPoints)[ 0];
+  (*gridPoints)[i].neigh[1] = &(*gridPoints)[ 4];
+  (*gridPoints)[i].neigh[2] = &(*gridPoints)[ 9];
+  (*gridPoints)[i].neigh[3] = &(*gridPoints)[ 5];
+  (*gridPoints)[i].neigh[4] = &(*gridPoints)[ 2];
+
+  i = 9;
+  (*gridPoints)[i].neigh[0] = &(*gridPoints)[ 1];
+  (*gridPoints)[i].neigh[1] = &(*gridPoints)[ 3];
+  (*gridPoints)[i].neigh[2] = &(*gridPoints)[ 5];
+  (*gridPoints)[i].neigh[3] = &(*gridPoints)[ 8];
+  (*gridPoints)[i].neigh[4] = &(*gridPoints)[ 4];
+
+  i = 10;
+  (*gridPoints)[i].neigh[0] = &(*gridPoints)[ 0];
+  (*gridPoints)[i].neigh[1] = &(*gridPoints)[ 2];
+  (*gridPoints)[i].neigh[2] = &(*gridPoints)[ 7];
+  (*gridPoints)[i].neigh[3] = &(*gridPoints)[11];
+  (*gridPoints)[i].neigh[4] = &(*gridPoints)[ 6];
+
+  i = 11;
+  (*gridPoints)[i].neigh[0] = &(*gridPoints)[ 1];
+  (*gridPoints)[i].neigh[1] = &(*gridPoints)[ 6];
+  (*gridPoints)[i].neigh[2] = &(*gridPoints)[10];
+  (*gridPoints)[i].neigh[3] = &(*gridPoints)[ 7];
+  (*gridPoints)[i].neigh[4] = &(*gridPoints)[ 3];
+
+  i = 12;
+  for(j=0;j<(*gridPoints)[i].numNeigh;j++)
+    (*gridPoints)[i].neigh[j] = &(*gridPoints)[j];
+
+return numDims;
+}
+
+/*....................................................................*/
+int icosahedronCells(double *vertexCoords, struct simplex **cells, unsigned long *numCells){
   /*
 The pointer vertexCoords should be malloc'd and filled first, preferably via icosahedronVertices().
 
 The calling routine should free *cells after use.
   */
-  int i,j;//,k,vi,vvi;
+  int i,j;
   const int numDims=3,numEdgesPerCell=(numDims*(numDims+1))/2;
 
   *numCells = 20;
@@ -339,6 +452,8 @@ The calling routine should free *cells after use.
 
   /* Finally, calculate the centres of the cells: */
   calcCellCentres(numDims, *numCells, vertexCoords, *cells);
+
+return numDims;
 }
 
 

@@ -3,9 +3,9 @@
 
 #include "../src/raythrucells.h"
 
-void	icosahedronVertices(double **vertexCoords, unsigned long *numPoints);
-//void	icosahedronCells(double *vertexCoords, edgeType **edges, unsigned long *numEdges, struct simplex **dc, unsigned long *numCells);
-void	icosahedronCells(double *vertexCoords, struct simplex **dc, unsigned long *numCells);
+int	icosahedronVertices(double **vertexCoords, unsigned long *numPoints);
+int	icosahedronGrid(struct gridPoint **gridPoints, unsigned long *numPoints);
+int	icosahedronCells(double *vertexCoords, struct simplex **dc, unsigned long *numCells);
 
 #endif /* ICOSAHEDRON_H */
 

@@ -84,13 +84,15 @@ void project(const int testI){
   double rayStart[numDims],rayDir[]={0.0,0.0,1.0};
   int numCubes[]={5,5,5},status=0;
   char *fileName="junk.fits";
-  int sizes[3],xi,yi,vi,i;
+  int sizes[3],xi,yi,vi,i,dummyNumDims;
   double xLos[3],xHis[3],frac,startZ,finisZ,imageHalfWidth,imageXOffset=0.0,imageYOffset=0.0;
   unsigned long ppi;
 
   intersectType entryIntcpt,*cellExitIntcpts=NULL;
   unsigned long *chainOfCellIds=NULL;
   int lenChainPtrs;
+
+  (void)dummyNumDims; /* Stops the 'variable set but not used' warning. */
 
   printf("Running project() with test %d\n", testI);
 
@@ -149,9 +151,9 @@ void project(const int testI){
       printf("  Projecting an icosahedron.\n");
       imageHalfWidth=2.1;
 
-      icosahedronVertices(&vertexCoords, &numPoints);
+      dummyNumDims = icosahedronVertices(&vertexCoords, &numPoints);
       rotate(10.0, 11.0, 12.0, vertexCoords, numPoints, numDims); /* Just a bit of random rotation. */
-      icosahedronCells(vertexCoords, &cells, &numCells);
+      dummyNumDims = icosahedronCells(vertexCoords, &cells, &numCells);
 
       break;
 	  
@@ -258,7 +260,7 @@ void makeHypercube(void){
   const int numXPixels=100,numYPixels=100,numZPixels=100;
   const double epsilon=1.0e-6;
   double x,y,z,*ray=NULL;
-  int numCubes[]={5,5,5},status=0,di;
+  int numCubes[]={5,5,5},di,status=0;
   char *fileName0="junk_interp.fits",*fileName1="junk_direct.fits";
   int sizes[numDims];
   double xLos[numDims],xHis[numDims],imageHalfWidth=0.5,imageXOffset=0.5,imageYOffset=0.5,imageZOffset=0.5;
@@ -267,9 +269,11 @@ void makeHypercube(void){
   int pxi[numDims],xi,yi,zi;
   double frac;
 
+  (void)status; /* Stops the 'variable set but not used' warning. */
+
   printf("Running makeHypercube()\n");
 
-const int testXi=0,testYi=10,testZi=3;
+const int testYi=10,testZi=3;
 
   dissectedCubeVertices(numCubes, &vertexCoords, &numPoints);
 
@@ -372,6 +376,8 @@ void doTestPlot(double *yValues, const int numValues){
   float *xVals=NULL,*yVals=NULL,minYVal=0.0,maxYVal=0.0,yPad;
   int i,devId;
 
+  (void)devId; /* Stops the 'variable set but not used' warning. */
+
   xVals = malloc(sizeof(*xVals)*numValues);
   yVals = malloc(sizeof(*yVals)*numValues);
   for(i=0;i<numValues;i++){
@@ -465,11 +471,10 @@ void checkRayInterp(void){
   struct simplex *cells=NULL;
   const int numXPixels=100,numYPixels=100,numZPixels=100;
   const double epsilon=1.0e-6;
-  double rayDir[]={0.0,0.0,1.0},x,y,z,*ray=NULL;
-  int numCubes[]={5,5,5},status=0,di,rtcStatus=0,lenChainPtrs=0;
+  double rayDir[]={0.0,0.0,1.0},x,y,z;
+  int numCubes[]={5,5,5},di,rtcStatus=0,lenChainPtrs=0;
   axisType axes[N_DIMS];
-  int pxi[numDims],xi,yi,zi;
-  double frac;
+  int pxi[numDims];
   intersectType entryIntcptFirstCell;
   unsigned long *chainOfCellIds=NULL;
   intersectType *cellExitIntcpts=NULL;
@@ -568,7 +573,7 @@ I want to check that write3Dfits() produces a cube with the coordinate axes in t
   const int numDims=3;
   char *fileName="junk_1pixel.fits";
   double *hypercube=NULL;
-  int sizes[numDims],di,pxi[numDims];//,xi,yi,zi;
+  int sizes[numDims],di,pxi[numDims];
   double xLos[numDims],xHis[numDims],imageHalfWidth=0.5,imageXOffset=0.5,imageYOffset=0.5,imageZOffset=0.5;;
   unsigned long numPointsInCube,ppi;
   const int numXPixels=100,numYPixels=100,numZPixels=100;

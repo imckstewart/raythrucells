@@ -33,6 +33,12 @@
 
 /* In the following comments, N is short for N_DIMS, the number of spatial dimensions. */
 
+struct gridPoint {
+  unsigned long id;
+  int numNeigh;
+  struct gridPoint **neigh;
+};
+
 /* The following is just a convenience struct to contain a bunch of stuff which are passed very often together to functions in the 2nd-order interpolation routines. It should be initialized in initializeBaryBuf().
 */
 typedef struct  {
@@ -81,6 +87,14 @@ int	followRayThroughCells(const int numDims, double *x, double *dir\
   , faceType **facePtrs[N_DIMS+1], double *vertexCoords\
   , intersectType *entryIntcpt, unsigned long **chainOfCellIds\
   , intersectType **cellExitIntcpts, int *lenChainPtrs);
+
+void	calcCellCentres(const int numDims, const unsigned long numCells, double *vertexCoords, struct simplex *dc);
+_Bool	getNextEdgeSet(const int numDims, const int numNeigh, _Bool *start, int neighSet[numDims]);
+_Bool	edgesFormACell(const int numDims, struct gridPoint *gp, int neighSet[numDims]);
+void	addRawCell(const int numDims, struct simplex *candidateCell, struct simplex **cells, int *maxNumCells, int *numCells);
+_Bool	cellVerticesMatch(const int numDims, struct simplex *cellA, struct simplex *cellB);
+void	getCellsFromGrid(const int numDims, struct gridPoint *gp, const unsigned long numPoints, struct simplex **cells, unsigned long *numCells);
+void	getEdges(const int numDims, struct simplex *cells, const unsigned long numCells, edgeType **edges, unsigned long *numEdges);
 
 #endif /* RAYTHRUCELLS_H */
 

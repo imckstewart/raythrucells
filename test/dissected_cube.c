@@ -7,7 +7,6 @@ Faces are numbered for their opposing vertices.
 */
 
 #include "dissected_cube.h"
-#include "rt_utils.h"
 
 /*....................................................................*/
 unsigned long
