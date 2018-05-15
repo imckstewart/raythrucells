@@ -208,6 +208,8 @@ getCellsFromGrid(const int numDims, struct gridPoint *gp, const unsigned long nu
 For the sake of brevity I'll represent numDims in these comments by N.
 
 We want here to construct the set of simplicial (i.e. tetrahedral in 3 spatial dimensions) cells that matches the points and links information stored in gp. By 'construct' we mean (i) first of all, calculate the number of cells; (ii) work out which points lie at the N+1 vertices of each cell; (iii) work out which neighbour cells abut the N+1 faces of each cell. The problem is that we will have to deal with reduncancy. The outer loop is over grid points, but since cells have N+1 vertices, looping over the points means we will count each cell N+1 times. Dealing with this will be slow (of order N^2).
+
+Note that we do *not* fill in sensible values of 'edges' or 'centre' for the cells.
   */
 
   unsigned long maxNumCells,iul,jul;
@@ -275,8 +277,10 @@ We want here to construct the set of simplicial (i.e. tetrahedral in 3 spatial d
       }
 
       for(di=0;di<numDims+1;di++){
+        (*cells)[*numCells-1].id = *numCells-1;
         (*cells)[*numCells-1].vertx[di] = cellsThisPoint[i].vertx[di];
         (*cells)[*numCells-1].neigh[di] = NULL;
+//*** should really zero 'edges' and 'centre'.
       }
     }
 
