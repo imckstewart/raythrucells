@@ -1,193 +1,187 @@
 #include "test.h"
 
+/*
+This contains (or will eventually contain) unit tests for all the routines in the ../src directory.
+*/
+
 int main(int argc, char *argv[]) {
-  int testI=0;
+  int status=0;
+  int moduleI=0,functionI=0;
 
-  int numDims=3;
-  _Bool start,finished;
-  int numNeigh,i;
-  int neighSet[numDims];
-
-  struct gridPoint *gp=NULL;
-  struct simplex candidateCell,*cells=NULL;
-  unsigned long maxNumCells,numCells,numGridPoints,iul;
-
-  _Bool isCell;
-
-  struct simplex cellA,cellB;
-  _Bool matchFound;
-
-
-  if(argc>1) testI=atoi(argv[1]);
-
-  switch(testI){
-    case 0:
-      makeHypercube();
-      break;
-    case 1:
-      checkCubeIndexing2();
-      break;
-    case 2:
-      checkRayInterp();
-      break;
-    case 3:
-      testFits();
-      break;
-    case 4:
-    case 5:
-    case 6:
-      project(testI-4);
-      break;
-
-    /* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .*/
-    case 7:
-      start = TRUE;
-      finished = FALSE;
-      numNeigh = 5;
-
-      do{ /* loop over the combinations of N unique neighbours. */
-        finished = getNextEdgeSet(numDims, numNeigh, &start, neighSet);
-        if(!finished) printf("[%d, %d, %d]\n", neighSet[0],neighSet[1],neighSet[2]);
-      }while(!finished);
-      break;
-
-    /* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .*/
-    case 8:
-      numDims = icosahedronGrid(&gp, &numGridPoints);
-
-      neighSet[0] = 0;
-      neighSet[1] = 1;
-      neighSet[2] = 2;
-      isCell = edgesFormACell(numDims, &gp[0], neighSet);
-      printf("Is cell? %d (should be 0)\n", (int)isCell);
-
-      neighSet[0] = 0;
-      neighSet[1] = 1;
-      neighSet[2] = 4;
-      isCell = edgesFormACell(numDims, &gp[0], neighSet);
-      printf("Is cell? %d (should be 0)\n", (int)isCell);
-
-      neighSet[0] = 0;
-      neighSet[1] = 1;
-      neighSet[2] = 5;
-      isCell = edgesFormACell(numDims, &gp[0], neighSet);
-      printf("Is cell? %d (should be 1)\n", (int)isCell);
-
-      neighSet[0] = 0;
-      neighSet[1] = 2;
-      neighSet[2] = 5;
-      isCell = edgesFormACell(numDims, &gp[0], neighSet);
-      printf("Is cell? %d (should be 0)\n", (int)isCell);
-
-      free(gp);
-      break;
-
-    /* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .*/
-    case 9:
-      maxNumCells = RTC_BUFFER_SIZE;
-      cells = malloc(sizeof(*cells)*maxNumCells);
-      numCells = 0;
-      numGridPoints = 6;
-
-      gp = malloc(sizeof(*gp)*numGridPoints);
-      for(i=0;i<numGridPoints;i++)
-        gp[i].id = (unsigned long)i;
-
-      candidateCell.vertx[0] = 1;
-      candidateCell.vertx[1] = 4;
-      candidateCell.vertx[2] = 2;
-      candidateCell.vertx[3] = 3;
-      addRawCell(numDims, &candidateCell, &cells, (int *)&maxNumCells, (int *)&numCells);
-      printf("numCells=%lu (expect 1)\n", numCells);
-
-      candidateCell.vertx[0] = 2;
-      candidateCell.vertx[1] = 3;
-      candidateCell.vertx[2] = 4;
-      candidateCell.vertx[3] = 5;
-      addRawCell(numDims, &candidateCell, &cells, (int *)&maxNumCells, (int *)&numCells);
-      printf("numCells=%lu (expect 2)\n", numCells);
-
-      candidateCell.vertx[0] = 4;
-      candidateCell.vertx[1] = 1;
-      candidateCell.vertx[2] = 3;
-      candidateCell.vertx[3] = 2;
-      addRawCell(numDims, &candidateCell, &cells, (int *)&maxNumCells, (int *)&numCells);
-      printf("numCells=%lu (expect 2)\n", numCells);
-
-      candidateCell.vertx[0] = 2;
-      candidateCell.vertx[1] = 0;
-      candidateCell.vertx[2] = 3;
-      candidateCell.vertx[3] = 1;
-      addRawCell(numDims, &candidateCell, &cells, (int *)&maxNumCells, (int *)&numCells);
-      printf("numCells=%lu (expect 3)\n", numCells);
-
-      free(gp);
-      free(cells);
-
-      break;
-
-    /* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .*/
-    case 10:
-
-      cellA.vertx[0] = 0;
-      cellA.vertx[1] = 1;
-      cellA.vertx[2] = 2;
-      cellA.vertx[3] = 3;
-      cellB.vertx[0] = 0;
-      cellB.vertx[1] = 2;
-      cellB.vertx[2] = 1;
-      cellB.vertx[3] = 3;
-      matchFound = cellVerticesMatch(numDims, &cellA, &cellB);
-      printf("matchFound? %d (expect 1)\n", (int)matchFound);
-
-      cellA.vertx[0] = 0;
-      cellA.vertx[1] = 4;
-      cellA.vertx[2] = 2;
-      cellA.vertx[3] = 3;
-      cellB.vertx[0] = 0;
-      cellB.vertx[1] = 2;
-      cellB.vertx[2] = 1;
-      cellB.vertx[3] = 3;
-      matchFound = cellVerticesMatch(numDims, &cellA, &cellB);
-      printf("matchFound? %d (expect 0)\n", (int)matchFound);
-
-      break;
-
-    /* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .*/
-    case 11:
-      numDims = icosahedronGrid(&gp, &numGridPoints);
-      getCellsFromGrid(numDims, gp, numGridPoints, &cells, &numCells);
-
-      for(iul=0;iul<numCells;iul++){
-        printf("Cell %2lu:\n  vertx=[", iul);
-        for(i=0;i<numDims;i++){
-          printf("%2lu, ", cells[iul].vertx[i]);
-        }
-        i = numDims;
-        printf("%2lu]\n  neigh=[", cells[iul].vertx[i]);
-        for(i=0;i<numDims;i++){
-          if(cells[iul].neigh[i]==NULL)
-            printf(" -, ");
-          else
-            printf("%2lu, ", cells[iul].neigh[i]->id);
-        }
-        i = numDims;
-        if(cells[iul].neigh[i]==NULL)
-          printf(" -]\n");
-        else
-          printf("%2lu]\n", cells[iul].neigh[i]->id);
-      }
-
-      free(cells);
-      free(gp);
-
-      break;
-
-    default:
-      printf("Test integer %d not recognized.\n", testI);
+  if(argc<3){
+    printf("Useage: ./mytest <name of module> <name of function>\n");
 return 1;
   }
 
-return 0;
+  if(!getModuleI(argv[1], &moduleI)){
+    printf("Module %s not found.\n", argv[1]);
+return 3;
+  }
+
+  if(!getFunctionI(argv[2], moduleI, &functionI)){
+    printf("Function %s of module %s not found.\n", argv[2], argv[1]);
+return 4;
+  }
+
+  if(moduleI==MOD_RT_UTILS){
+    switch(functionI){
+      case FUN_GRAMSCHMIDT:
+        status = check_gramSchmidt();
+        break;
+
+      case FUN_CALCDOTPRODUCT:
+        status = check_calcDotProduct();
+        break;
+
+      case FUN_CALCCELLCENTRES:
+        status = check_calcCellCentres();
+        break;
+
+      case FUN_GETNEXTEDGESET:
+        status = check_getNextEdgeSet();
+        break;
+
+      case FUN_GRIDPOINTSARENEIGHBOURS:
+        status = check_gridPointsAreNeighbours();
+        break;
+
+      case FUN_EDGESFORMACELL:
+        status = check_edgesFormACell();
+        break;
+
+      case FUN_CELLVERTICESMATCH:
+        status = check_cellVerticesMatch();
+        break;
+
+      case FUN_ADDRAWCELL:
+        status = check_addRawCell();
+        break;
+
+      case FUN_GETCELLSFROMGRID:
+        status = check_getCellsFromGrid();
+        break;
+
+      case FUN_GETEDGES:
+        status = check_getEdges();
+        break;
+
+      case FUN_CALCBARYCOORDS:
+        status = check_calcBaryCoords();
+        break;
+
+      default:
+        status = 5;
+    }
+
+  }else if(moduleI==MOD_RAYTHRUCELLS){
+    switch(functionI){
+      case FUN_EXTRACTFACE:
+        status = check_extractFace();
+        break;
+
+      case FUN_GETNEWENTRYFACEI:
+        status = check_getNewEntryFaceI();
+        break;
+
+      case FUN_CALCFACEINNMINUS1:
+        status = check_calcFaceInNMinus1();
+        break;
+
+      case FUN_INTERSECTLINEWITHFACE:
+        status = check_intersectLineWithFace();
+        break;
+
+      case FUN_FOLLOWGOODCHAIN:
+        status = check_followGoodChain();
+        break;
+
+      case FUN_BUILDRAYCELLCHAIN:
+        status = check_buildRayCellChain();
+        break;
+
+      case FUN_FOLLOWRAYTHROUGHCELLS:
+        status = check_followRayThroughCells();
+        break;
+
+      default:
+        status = 5;
+    }
+
+  }else if(moduleI==MOD_MESHTOCUBE){
+    switch(functionI){
+      case FUN_INTERPOLATEATFACE:
+        status = check_interpolateAtFace();
+        break;
+
+      case FUN_GETFACEINTERPSALONGRAY:
+        status = check_getFaceInterpsAlongRay();
+        break;
+
+      case FUN_INTERPONGRIDALONGRAY:
+        status = check_interpOnGridAlongRay();
+        break;
+
+      case FUN_GENERATEVOXELINDEX:
+        status = check_generateVoxelIndex();
+        break;
+
+      case FUN_GENERATENEXTPIXELCOMBO:
+        status = check_generateNextPixelCombo();
+        break;
+
+      case FUN_CELLSTOHYPERCUBE:
+        status = check_cellsToHyperCube();
+        break;
+
+      default:
+        status = 5;
+    }
+
+  }else if(moduleI==MOD_SECOND_ORDER){
+    switch(functionI){
+      case FUN_EVALUATE2NDORDERSHAPEFNS:
+        status = check_evaluate2ndOrderShapeFns();
+        break;
+
+      case FUN_INTERPOLATE2NDORDERCELL:
+        status = check_interpolate2ndOrderCell();
+        break;
+
+      case FUN_GETPARABOLICSHAPEFNS:
+        status = check_getParabolicShapeFns();
+        break;
+
+      case FUN_INTERPOLATEPARABOLIC:
+        status = check_interpolateParabolic();
+        break;
+
+      case FUN_FACEBARYTOCELLBARY:
+        status = check_faceBaryToCellBary();
+        break;
+
+      case FUN_FILLBARYBUFFVALUES:
+        status = check_fillBaryBuffValues();
+        break;
+
+      case FUN_GETINTERPSALONGRAY:
+        status = check_getInterpsAlongRay();
+        break;
+
+      case FUN_SETRASTERFLAGS:
+        status = check_setRasterFlags();
+        break;
+
+      case FUN_INTERPONGRIDALONGRAY2NDORDER:
+        status = check_interpOnGridAlongRay2ndOrder();
+        break;
+
+      default:
+        status = 5;
+    }
+  }
+
+  printf("Status return %d\n", status);
+
+return status;
 }
 

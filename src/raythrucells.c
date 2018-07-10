@@ -1,31 +1,12 @@
 #include "raythrucells.h"
 
-/*....................................................................*/
-void __attribute__((weak))
-rtcError(int errCode, char *message){
-  printf("Error: %s\n", message);
-  exit(1);
-}
-
-/*....................................................................*/
-intersectType
-_initializeIntersect(const int numDims){
-  int di;
-  intersectType intcpt;
-
-  intcpt.fi = -1;
-  intcpt.orientation = 0;
-  for(di=0;di<numDims;di++)
-    intcpt.bary[di] = 0.0;
-  intcpt.dist = 0.0;
-  intcpt.collPar = 0.0;
-
-  return intcpt;
-}
+#ifdef TEST
+#include "../test/test.h"
+#endif
 
 /*....................................................................*/
 faceType
-extractFace(const int numDims, double *vertexCoords, struct simplex *cells\
+_extractFace(const int numDims, double *vertexCoords, struct simplex *cells\
   , const unsigned long dci, const int fi){
   /* Given a simplex cells[dci] and the face index (in the range {0...numDims}) fi, this returns the desired information about that face. Note that the ordering of the elements of face.r[] is the same as the ordering of the vertices of the simplex, cells[dci].vertx[]; just the vertex fi is omitted.
 
@@ -33,7 +14,7 @@ Note that the element 'centre' of the faceType struct is mean to contain the spa
  */
 
   const int numFaces=numDims+1;
-  int vi, vvi, di;
+  int vi,vvi,di;
   faceType face;
   unsigned long gi;
 
@@ -51,7 +32,7 @@ Note that the element 'centre' of the faceType struct is mean to contain the spa
   for(di=0;di<numDims;di++)
     face.simplexCentre[di] = cells[dci].centre[di];
 
-  return face;
+return face;
 }
 
 /*....................................................................*/
@@ -84,54 +65,24 @@ _calcFaceInNMinus1(const int numDims, const int numVertices, faceType *face){
   /*
 Each of the faces of a polytope in N spatial dimensions is itself a polytope in N-1 dimensions. Each face can therefore be represented via the coordinates of its vertices expressed in an (N-1)-dimensional frame oriented so as to be parallel to the face. The function of the present routine is to perform this decomposition and to return both the (N-1)-dimensional frame (specified via the coordinates in N dimensions of its N-1 basis vectors) and the coordinates in it of each of the M face vertices. (If the face is simplicial, M==N.)
 
-The calling routine should call freeFacePlusBasis() after it is finished with the returned object.
-
 Note that numVertices (a.k.a. M) is expected to be >= numDims (a.k.a. N). The thing would not make much sense otherwise.
   */
 
   facePlusBasisType facePlusBasis;
-  double vs[numVertices-1][numDims],dotValue,norm;
-  int di,vi,i,j,ddi;
+  double edgesMinusOrigin[numVertices-1][numDims],dotValue;
+  int di,vi,ddi;
 
-  /* The first part of the routine is finding the components in N-space of the N-1 orthonormal axes parallel to the face. It is essentially a modified (i.e numerically stabler) Gram-schmidt orthonormalization of the first N-1 vectors from face vertex 0 to each of its other vertices. In pseudo-code, suppose we have N-1 vectors *v and want to orthonormalize them to *u:
-
-	for(i=0;i<N-1;i++){
-	  u[i] = v[i]
-	  for(j=0;j<i;j++){
-	    u[i] -= (u[i].u[j])*u[j]
-	  }
-	  u[i] /= |u[i]|
-	}
-
+  /* The first part of the routine is finding the components in N-space of the N-1 orthonormal axes parallel to the face.
   */
   for(di=0;di<numDims;di++)
     facePlusBasis.origin[di] = (*face).r[0][di];
 
   for(vi=0;vi<numVertices-1;vi++){
     for(di=0;di<numDims;di++)
-      vs[vi][di] = (*face).r[vi+1][di] - (*face).r[0][di];
+      edgesMinusOrigin[vi][di] = (*face).r[vi+1][di] - facePlusBasis.origin[di];
   }
 
-  for(i=0;i<numDims-1;i++){
-    for(di=0;di<numDims;di++)
-      facePlusBasis.axes[i][di] = vs[i][di];
-
-    for(j=0;j<i;j++){
-      dotValue = 0.0;
-      for(di=0;di<numDims;di++)
-        dotValue += facePlusBasis.axes[i][di]*facePlusBasis.axes[j][di];
-      for(di=0;di<numDims;di++)
-        facePlusBasis.axes[i][di] -= dotValue*facePlusBasis.axes[j][di];
-    }
-
-    norm = 0.0;
-    for(di=0;di<numDims;di++){
-      norm += facePlusBasis.axes[i][di]*facePlusBasis.axes[i][di];
-    }
-    norm = 1.0/sqrt(norm);
-    for(di=0;di<numDims;di++)
-      facePlusBasis.axes[i][di] *= norm;
-  }
+  gramSchmidt(numDims, numDims-1, edgesMinusOrigin, facePlusBasis.axes);
 
   /* Now we calculate the coords of each vertex in the N-1 system:
   */
@@ -141,101 +92,12 @@ Note that numVertices (a.k.a. M) is expected to be >= numDims (a.k.a. N). The th
 
   for(vi=1;vi<numVertices;vi++){
     for(ddi=0;ddi<numDims-1;ddi++){
-
-      dotValue = 0.0;
-      for(di=0;di<numDims;di++)
-        dotValue += vs[vi-1][di]*facePlusBasis.axes[ddi][di];
-
+      dotValue = calcDotProduct(numDims, edgesMinusOrigin[vi-1], facePlusBasis.axes[ddi]);
       facePlusBasis.r[vi][ddi] = dotValue;
     }
   }
 
   return facePlusBasis;
-}
-
-/*....................................................................*/
-void
-_calcBaryCoords(const int numDims, double vertices[N_DIMS][N_DIMS-1]\
-  , double *x, double *bary){
-  /*
-In an N-dimensional space, the final N barycentric coordinates L_ = {L_1,L_2,...,L_N} of a point x_ inside a simplex with vertices r_0_ to r_N_ are given by
-
-	T L_ = x_ - r_0_
-
-where T is an N*N matrix with entries
-
-	T_{i,j} = r_j+1[i] - r_0[i].
-
-
-The 0th barycentric coordinate, L_0, is given by
-
-	         __N
-	         \
-	L_0 = 1 - >    L_i.
-	         /_i=1
-
-See the Wikipedia article on barycentric coordinates for further information.
-
-The pointer x must be malloc'd to >= sizeof(*x)*numDims and bary must be malloc'd to >= sizeof(*bary)*(numDims+1).
-  */
-  int i,j;
-  double tMat[numDims][numDims],bVec[numDims],det;
-  char errStr[RTC_MSG_STR_LEN];
-
-  if(numDims==1 || numDims==2){
-    for(i=0;i<numDims;i++){
-      for(j=0;j<numDims;j++)
-        tMat[i][j] = vertices[j+1][i] - vertices[0][i];
-      bVec[i] = x[i] - vertices[0][i];
-    }
-
-    if(numDims==1)
-      bary[1] = bVec[0]/tMat[0][0];
-
-    else{ /* numDims==2 */
-      det = tMat[0][0]*tMat[1][1] - tMat[0][1]*tMat[1][0];
-      /*** We're assuming that the simplex (a triangle in the present case) is not pathological, i.e that det!=0. */
-      bary[1] = ( tMat[1][1]*bVec[0] - tMat[0][1]*bVec[1])/det;
-      bary[2] = (-tMat[1][0]*bVec[0] + tMat[0][0]*bVec[1])/det;
-    }
-
-  }else{ /* Assume numDims>2 */
-    int dummySignum,status=0;
-    gsl_matrix *gslT = gsl_matrix_alloc(numDims-1, numDims-1);
-    gsl_vector *gsl_x = gsl_vector_alloc(numDims-1);
-    gsl_vector *gsl_b = gsl_vector_alloc(numDims-1);
-    gsl_permutation *p = gsl_permutation_alloc(numDims-1);
-
-    for(i=0;i<numDims;i++){
-      for(j=0;j<numDims;j++)
-        gsl_matrix_set(gslT, i, j, vertices[j+1][i] - vertices[0][i]);
-      gsl_vector_set(gsl_b, i, x[i] - vertices[0][i]);
-    }
-
-    status = gsl_linalg_LU_decomp(gslT,p,&dummySignum);
-    if(status){
-      snprintf(errStr, RTC_MSG_STR_LEN, "LU decomposition failed (GSL error %d).", status);
-      rtcError(RTC_ERR_LU_DECOMP_FAIL, errStr);
-    }
-
-    status = gsl_linalg_LU_solve(gslT,p,gsl_b,gsl_x);
-    if(status){
-      snprintf(errStr, RTC_MSG_STR_LEN, "LU solver failed (GSL error %d).", status);
-      rtcError(RTC_ERR_LU_SOLVE_FAIL, errStr);
-    }
-
-    for(i=0;i<numDims;i++)
-      bary[i+1] = gsl_vector_get(gsl_x,i);
-
-    gsl_permutation_free(p);
-    gsl_vector_free(gsl_b);
-    gsl_vector_free(gsl_x);
-    gsl_matrix_free(gslT);
-  }
-
-  bary[0] = 1.0;
-  for(i=1;i<numDims+1;i++)
-    bary[0] -= bary[i];
 }
 
 /*....................................................................*/
@@ -269,6 +131,8 @@ Notes:
 	* This routine works best when the sides of the face are not too disparate in size.
 
 	* There is, of course, no guarantee that the line actually intersects the face, even if the line and the face are non-parallel. There are also borderline cases, i.e. where the line passes close to a vertex, in which an exact calculation would show that the intersection occurs (or doesn't occur), but the imprecise computed value claims that it doesn't (or does). Intersection may be judged via the values of the barycentric coordinates (BC): if the BC all fall in the interval [0,1], the line intersects the face; if one of the BC is negative, it doesn't.
+
+        * The routine does not fill in the value of intcpt.fi because it does not have access to vertex indices.
   */
   const double oneOnEpsilon=1.0/epsilon;
   double vs[numDims-1][numDims],norm[numDims],normDotDx,numerator,pxInFace[numDims-1];
@@ -429,7 +293,7 @@ The final BC L_0 is given by
 	         /_i=1
   */
 
-  _calcBaryCoords(numDims-1, facePlusBasis.r, pxInFace, intcpt.bary);
+  calcBaryCoords(numDims-1, facePlusBasis.r, pxInFace, intcpt.bary);
 
   /* Finally, calculate the 'collision parameter':
   */
@@ -453,13 +317,120 @@ The final BC L_0 is given by
 }
 
 /*....................................................................*/
+_Bool
+_followGoodChain(const int numDims, double *x, double *dir\
+  , struct simplex *cells, unsigned long dci, int cellEntryFaceI\
+  , const double epsilon, faceType **facePtrs[numDims+1]\
+  , double *vertexCoords, _Bool **cellVisited, cellChainType *cellChain\
+  , intersectType marginalExitIntcpts[numDims+1], int *numMarginalExits){
+
+  /*
+Returns TRUE if the chain terminated at the edge of the set of cells, following only good interceptions.
+
+Input arguments:
+	numDims
+	x
+	dir
+	cells
+	dci
+	cellEntryFaceI
+	epsilon
+	facePtrs
+	vertexCoords
+
+In/out arguments:
+	cellVisited
+	cellChain
+
+Output arguments:
+	marginalExitIntcpts
+	numMarginalExits
+
+  */
+
+  const int numFaces=numDims+1;
+  int numGoodExits,fi,goodExitFis[numFaces],marginalExitFis[numFaces],exitFi;
+  faceType face;
+  intersectType cellIntcpt[numFaces];
+
+  while(TRUE){ /* We'll break out of it (via function returns) either if the chain terminates at the edge of the set of cells or as soon as we have no good cell exits and no single marginal exit. */
+    (*cellVisited)[dci] = TRUE;
+
+    /* If there is not enough room in chainOfCellIds and cellExitIntcpts, realloc them to new value of lenChainPtrs. */
+    if(cellChain->nCellsInChain >= cellChain->nCellsMallocd)
+      cellChain = realloc_cellChain(cellChain, cellChain->nCellsMallocd + RTC_BUFFER_SIZE);
+
+    /* Store the current cell ID (we leave storing the exit face for later, when we know what it is). */
+    cellChain->cellIds[cellChain->nCellsInChain] = dci;
+
+    /* Calculate numbers of good and marginal exits.
+    */
+    numGoodExits = 0;
+    *numMarginalExits = 0;
+
+    for(fi=0;fi<numFaces;fi++){
+      if(fi!=cellEntryFaceI && (cells[dci].neigh[fi]==NULL || !(*cellVisited)[cells[dci].neigh[fi]->id])){
+        /* Store points for this face: */
+        if(facePtrs==NULL){
+          face = _extractFace(numDims, vertexCoords, cells, dci, fi);
+        }else{
+          face = (*facePtrs)[dci][fi];
+        }
+
+        /* Now calculate the intercept: */
+        cellIntcpt[fi] = _intersectLineWithFace(numDims, x, dir, &face, epsilon);
+        cellIntcpt[fi].fi = fi; /* Ultimately we need this so we can relate the bary coords for the face back to the Delaunay cell. */
+
+        if(cellIntcpt[fi].orientation>0){ /* it is an exit face. */
+          if(cellIntcpt[fi].collPar-epsilon>0.0){
+            goodExitFis[numGoodExits] = fi;
+            numGoodExits++;
+          }else if (cellIntcpt[fi].collPar+epsilon>0.0){
+            marginalExitFis[*numMarginalExits] = fi;
+            marginalExitIntcpts[*numMarginalExits] = cellIntcpt[fi];
+            (*numMarginalExits)++;
+          }
+        }
+      }
+    }
+
+    if(numGoodExits>1)
+      rtcError(RTC_ERR_BUG, "Some sort of bug: more than 1 firm candidate found for ray exit from cell.");
+
+    if(numGoodExits<1 && (*numMarginalExits)!=1)
+return FALSE;
+
+    /* If we have reached here then we only have a single exit from the present cell (rated either 'good' or 'marginal').
+    */
+    if(numGoodExits==1)
+      exitFi = goodExitFis[0];
+    else /* (*numMarginalExits)==1 */
+      exitFi = marginalExitFis[0];
+
+    /* Store the exit face details: */
+    cellChain->exitIntcpts[cellChain->nCellsInChain] = cellIntcpt[exitFi];
+
+    cellChain->nCellsInChain++;
+
+    if(cells[dci].neigh[exitFi]==NULL){ /* Signals that we have reached the edge of the model. */
+      /* Realloc the ptrs to their final sizes:
+      */
+      cellChain = realloc_cellChain(cellChain, cellChain->nCellsInChain);
+return TRUE;
+    }
+
+    cellEntryFaceI = _getNewEntryFaceI(numDims, dci, *(cells[dci].neigh[exitFi]));
+    dci = cells[dci].neigh[exitFi]->id;
+  };
+}
+
+/*....................................................................*/
 int
 _buildRayCellChain(const int numDims, double *x, double *dir\
-  , struct simplex *cells, _Bool **cellVisited, unsigned long dci\
-  , int entryFaceI, int levelI, int nCellsInChain, const double epsilon\
-  , faceType **facePtrs[N_DIMS+1], double *vertexCoords\
-  , unsigned long **chainOfCellIds, intersectType **cellExitIntcpts\
-  , int *lenChainPtrs){
+  , struct simplex *cells, unsigned long dci\
+  , int entryFaceI, int levelI, const double epsilon\
+  , faceType **facePtrs[numDims+1], double *vertexCoords\
+  , _Bool **cellVisited, cellChainType *cellChain){
   /*
 This function is designed to follow a ray (defined by a starting locus 'x' and a direction vector 'dir') through a convex connected set of cells (assumed simplicial). The function returns an integer status value directly, and two lists (plus their common length) via the argument interface: chainOfCellIds and cellExitIntcpts. Taken together, these lists define a chain of cells traversed by the ray.
 
@@ -484,129 +455,61 @@ The function terminates under the following conditions:
 
 At a successful termination, therefore, details of all the cells to the edge of the model are correctly stored in chainOfCellIds and cellExitIntcpts, and the number of these cells is returned in lenChainPtrs.
 
-***** Note that it is assumed here that a mis-indentification of the actual cell traversed by a ray in marginal cases will not ultimately matter to the external calling routine. This is only reasonable if whatever function or property is being sampled by the ray does not vary in a stepwise manner at any cell boundary. *****
+***** Note that it is assumed here that a mis-indentification of the actual cell traversed by a ray in marginal cases will not ultimately matter to the external calling routine, provided that the ray-face intersection points are sufficiently close to the boundary between the cells in question. This is only reasonable if whatever function or property is being sampled by the ray does not vary in a stepwise manner at any cell boundary. *****
   */
 
   const int numFaces=numDims+1;
-  _Bool followingSingleChain;
-  int numGoodExits,numMarginalExits,fi,goodExitFis[numFaces],marginalExitFis[numFaces],exitFi,i,status,newEntryFaceI;
-  faceType face;
-  intersectType intcpt[numFaces];
+  _Bool chainEndedOk;
+  int numMarginalExits,exitFi,i,status,newEntryFaceI;
+  intersectType marginalExitIntcpts[numFaces];
+  unsigned long lastGoodCellId;
 
-  followingSingleChain = 1; /* default */
-  do{ /* Follow the chain through 'good' cells, i.e. ones for which entry and exit are nicely distant from face edges. (Here we also follow marginal exits if there are no good ones, and only 1 marginal one.) */
-    (*cellVisited)[dci] = 1;
+  chainEndedOk = _followGoodChain(numDims, x, dir, cells, dci\
+    , entryFaceI, epsilon, facePtrs, vertexCoords, cellVisited, cellChain\
+    , marginalExitIntcpts, &numMarginalExits);
 
-    /* If there is not enough room in chainOfCellIds and cellExitIntcpts, realloc them to new value of lenChainPtrs. */
-    if(nCellsInChain>=(*lenChainPtrs)){
-      *lenChainPtrs += RTC_BUFFER_SIZE;
-      *chainOfCellIds  = realloc(*chainOfCellIds,  sizeof(**chainOfCellIds) *(*lenChainPtrs));
-      *cellExitIntcpts = realloc(*cellExitIntcpts, sizeof(**cellExitIntcpts)*(*lenChainPtrs));
-    }
+  if (chainEndedOk)
+return 0;
 
-    /* Store the current cell ID (we leave storing the exit face for later, when we know what it is). */
-    (*chainOfCellIds)[nCellsInChain] = dci;
-
-    /* calculate num good and bad exits */
-    numGoodExits = 0;
-    numMarginalExits = 0;
-    for(fi=0;fi<numFaces;fi++){
-      if(fi!=entryFaceI && (cells[dci].neigh[fi]==NULL || !(*cellVisited)[cells[dci].neigh[fi]->id])){
-        /* Store points for this face: */
-        if(facePtrs==NULL){
-          face = extractFace(numDims, vertexCoords, cells, dci, fi);
-        }else{
-          face = (*facePtrs)[dci][fi];
-        }
-
-        /* Now calculate the intercept: */
-        intcpt[fi] = _intersectLineWithFace(numDims, x, dir, &face, epsilon);
-        intcpt[fi].fi = fi; /* Ultimately we need this so we can relate the bary coords for the face back to the Delaunay cell. */
-
-        if(intcpt[fi].orientation>0){ /* it is an exit face. */
-          if(intcpt[fi].collPar-epsilon>0.0){
-            goodExitFis[numGoodExits] = fi;
-            numGoodExits++;
-          }else if (intcpt[fi].collPar+epsilon>0.0){
-            marginalExitFis[numMarginalExits] = fi;
-            numMarginalExits++;
-          }
-        }
-      }
-    }
-
-    if(numGoodExits>1){
-      rtcError(RTC_ERR_BUG, "Some sort of bug: more than 1 firm candidate found for ray exit from cell.");
-
-    }else if(numGoodExits==1 || numMarginalExits==1){
-      if(numGoodExits==1)
-        exitFi = goodExitFis[0];
-      else
-        exitFi = marginalExitFis[0];
-
-      /* Store the exit face details: */
-      (*cellExitIntcpts)[nCellsInChain] = intcpt[exitFi];
-
-      nCellsInChain++;
-
-      if(cells[dci].neigh[exitFi]==NULL){ /* Signals that we have reached the edge of the model. */
-        /* Realloc the ptrs to their final sizes: */
-        *chainOfCellIds  = realloc(*chainOfCellIds,  sizeof(**chainOfCellIds) *nCellsInChain);
-        *cellExitIntcpts = realloc(*cellExitIntcpts, sizeof(**cellExitIntcpts)*nCellsInChain);
-        *lenChainPtrs = nCellsInChain;
-
-        return 0;
-      }
-
-      entryFaceI = _getNewEntryFaceI(numDims, dci, *(cells[dci].neigh[exitFi]));
-      dci = cells[dci].neigh[exitFi]->id;
-
-    }else{
-      followingSingleChain = 0;
-    }
-  }while(followingSingleChain);
-
-  /* Now we have run out of good (or at least single) exit-face options, let's try the marginal ones. */
+  /* If we got to here, we have run out of good (or at least single) exit-face options, let's try the marginal ones. */
 
   if(numMarginalExits<1)
-    return RTC_ERR_BAD_CHAIN; /* Unsuccessful end of this chain. */
+return RTC_ERR_BAD_CHAIN; /* Unsuccessful end of this chain. */
 
   /* If we have got to this point, we must have numMarginalExits>1; thus we have a fork in the chain, and must explore each branch. We recurse here because a recursive scheme is the best way to do that.
   */
+  lastGoodCellId = cellChain->cellIds[cellChain->nCellsInChain];
   for(i=0;i<numMarginalExits;i++){
-    exitFi = marginalExitFis[i];
-    (*cellExitIntcpts)[nCellsInChain] = intcpt[exitFi];
+    cellChain->exitIntcpts[cellChain->nCellsInChain] = marginalExitIntcpts[i];
+    exitFi = marginalExitIntcpts[i].fi;
 
-    if(cells[dci].neigh[exitFi]==NULL){ /* Signals that we have reached the edge of the model. */
+    if(cells[lastGoodCellId].neigh[exitFi]==NULL){ /* Signals that we have reached the edge of the model. */
       /* Realloc the ptrs to their final sizes: */
-      nCellsInChain++;
-      *chainOfCellIds  = realloc(*chainOfCellIds,  sizeof(**chainOfCellIds) *nCellsInChain);
-      *cellExitIntcpts = realloc(*cellExitIntcpts, sizeof(**cellExitIntcpts)*nCellsInChain);
-      *lenChainPtrs = nCellsInChain;
-
+      cellChain->nCellsInChain++;
+      cellChain = realloc_cellChain(cellChain, cellChain->nCellsInChain);
       status = 0;
 
     }else{
-      newEntryFaceI = _getNewEntryFaceI(numDims, dci, *(cells[dci].neigh[exitFi]));
+      newEntryFaceI = _getNewEntryFaceI(numDims, lastGoodCellId, *(cells[lastGoodCellId].neigh[exitFi]));
 
       /* Now we dive into the branch: */
-      status = _buildRayCellChain(numDims, x, dir, cells, cellVisited\
-        , cells[dci].neigh[exitFi]->id, newEntryFaceI, levelI+1, nCellsInChain+1\
-        , epsilon, facePtrs, vertexCoords, chainOfCellIds, cellExitIntcpts, lenChainPtrs);
+      status = _buildRayCellChain(numDims, x, dir, cells\
+        , cells[lastGoodCellId].neigh[exitFi]->id, newEntryFaceI, levelI+1\
+        , epsilon, facePtrs, vertexCoords, cellVisited, cellChain);
     }
+
     if(status==0) break;
   }
 
-  return status;
+return status;
 }
 
 /*....................................................................*/
 int
 followRayThroughCells(const int numDims, double *x, double *dir\
   , struct simplex *cells, const unsigned long numCells, const double epsilon\
-  , faceType **facePtrs[N_DIMS+1], double *vertexCoords\
-  , intersectType *entryIntcpt, unsigned long **chainOfCellIds\
-  , intersectType **cellExitIntcpts, int *lenChainPtrs){
+  , faceType **facePtrs[numDims+1], double *vertexCoords\
+  , cellChainType *cellChain){
   /*
 The present function follows a ray through a connected, convex set of cells (assumed to be simplices) and returns information about the chain of cells it passes through. If the ray is found to pass through 1 or more cells, the function returns 0, indicating success; if not, it returns a non-zero value. The chain description consists of three pieces of information: (i) intercept information for the entry face of the first cell encountered; (ii) the IDs of the cells in the chain; (iii) intercept information for the exit face of the ith cell.
 
@@ -630,25 +533,26 @@ The function arguments:
 
     Outputs:
     --------
-	entryIntcpt: this gives the location where the ray (extended backward beyond its given starting point if necessary) first enters the mesh of cells. ***NOTE*** that since it is a scalar, non-convex meshes will not be handled correctly.
+	cellChain: contains the following fields of present interest:
+		entryIntcpt: this gives the location where the ray (extended backward beyond its given starting point if necessary) first enters the mesh of cells. ***NOTE*** that since it is a scalar, non-convex meshes will not be handled correctly.
 
-	chainOfCellIds: this is a list, in order, of the cells traversed by the ray from its first entry to its exit from the mesh of cells.
+		cellIds: this is a list, in order, of the cells traversed by the ray from its first entry to its exit from the mesh of cells.
 
-	cellExitIntcpts: a list of the locations where the ray exits each cell. Together with 'entryIntcpt', this enables the precise path of the ray through each cell in 'chainOfCellIds' to be known.
+		exitIntcpts: a list of the locations where the ray exits each cell. Together with 'entryIntcpt', this enables the precise path of the ray through each cell in 'chainOfCellIds' to be known.
 
-	lenChainPtrs: the length of the returned lists 'chainOfCellIds' and 'cellExitIntcpts'.
+		nCellsInChain: the length of the returned lists 'chainOfCellIds' and 'cellExitIntcpts'.
 
 
 Notes:
 ======
-The pointers *chainOfCellIds and *cellExitIntcpts should be freed after the function is called.
+The pointer *cellChain should be freed (via the function free_cellChain) after the present function is called.
 
 The argument facePtrs may be set to NULL, in which case the function will construct each face from the list of cells etc as it needs it. This saves on memory but takes more time. If the calling routine supplies these values it needs to do something like as follows:
 
 	faceType face,*facePtrs[N_DIMS+1]=malloc(sizeof(*(*facePtrs[N_DIMS+1]))*numCells);
 	for(dci=0;dci<numCells;dci++){
 	  for(j=0;j<numDims+1;j++){
-	    face = _extractFace(numDims, vertexCoords, cells, dci, j);
+	    face = __extractFace(numDims, vertexCoords, cells, dci, j);
 	    facePtrs[dci][j] = face;
 	  }
 	}
@@ -681,7 +585,7 @@ and filled as
       if(cells[dci].neigh[fi]==NULL){ /* means that this face lies on the outside of the model. */
         /* Store points for this face: */
         if(facePtrs==NULL){
-          face = extractFace(numDims, vertexCoords, cells, dci, fi);
+          face = _extractFace(numDims, vertexCoords, cells, dci, fi);
         }else{
           face = (*facePtrs)[dci][fi];
         }
@@ -707,44 +611,35 @@ and filled as
   }
 
   if(numEntryFaces<=0){
-    *entryIntcpt = _initializeIntersect(numDims);
-    *lenChainPtrs=0;
-    *chainOfCellIds=NULL;
-    *cellExitIntcpts=NULL;
+    *cellChain = init_cellChain(0);
 
-    return 0; /* This is ok, it can happen if the ray missed the mesh of cells entirely. */
+return 0; /* This is ok, it can happen if the ray missed the mesh of cells entirely. */
   }
 
-  *lenChainPtrs = RTC_BUFFER_SIZE; /* This can be increased within _buildRayCellChain(). */
-  *chainOfCellIds  = malloc(sizeof(**chainOfCellIds) *(*lenChainPtrs));
-  *cellExitIntcpts = malloc(sizeof(**cellExitIntcpts)*(*lenChainPtrs));
+  *cellChain = init_cellChain(RTC_BUFFER_SIZE);
   cellVisited = malloc(sizeof(*cellVisited)*numCells);
   for(dci=0;dci<numCells;dci++)
-    cellVisited[dci] = 0;
+    cellVisited[dci] = FALSE;
 
   for(i=0;i<numEntryFaces;i++){
-    status = _buildRayCellChain(numDims, x, dir, cells, &cellVisited\
-      , entryDcis[i], entryFis[i], 0, 0, epsilon, facePtrs, vertexCoords\
-      , chainOfCellIds, cellExitIntcpts, lenChainPtrs);
+    status = _buildRayCellChain(numDims, x, dir, cells\
+      , entryDcis[i], entryFis[i], 0, epsilon, facePtrs, vertexCoords\
+      , &cellVisited, cellChain);
 
     if(status==0) break;
   }
 
   if(status==0){ /* means ith entry face returned a good chain. */
-    *entryIntcpt = entryIntcpts[i];
+    cellChain->entryIntcpt = entryIntcpts[i];
     /* Note that the order of the bary coords, and the value of fi, are with reference to the vertx list of the _entered_ cell. This can't of course be any other way, because this ray enters this first cell from the exterior of the model, where there are no cells. For all the intersectType objects in the list cellExitIntcpts, the bary coords etc are with reference to the exited cell. */
 
   }else{ /* means none of the possibly >1 entry faces returned a good chain. Return with status value from last bad chain. */
-    *entryIntcpt = _initializeIntersect(numDims);
-    free(*chainOfCellIds);
-    *chainOfCellIds=NULL;
-    free(*cellExitIntcpts);
-    *cellExitIntcpts=NULL;
-    *lenChainPtrs=0;
+    free_cellChain(cellChain);
+    *cellChain = init_cellChain(0);
   }
 
   free(cellVisited);
 
-  return status;
+return status;
 }
 

@@ -1,23 +1,30 @@
 PROJ_SOURCES = \
+	src/meshtocube.c\
 	src/raythrucells.c\
-	src/rt_utils.c\
-	src/meshtocube.c
+	src/rtc_types.c\
+	src/rtc_utils.c\
+	src/second_order.c
 
 TEST_SOURCES = \
+	test/dissected_cube.c\
+	test/funcs_to_test.c\
+	test/icosahedron.c\
 	test/test.c\
 	test/testfunc.c\
-	test/icosahedron.c\
-	test/write_fits.c\
-	test/dissected_cube.c
+	test/test_prints.c\
+	test/test_utils.c\
+	test/write_fits.c
 
 PROJ_INCLUDES = \
 	src/dims.h\
+	src/meshtocube.h\
 	src/raythrucells.h\
-	src/rt_utils.h\
-	src/meshtocube.h
+	src/rtc_types.h\
+	src/second_order.h
 
 TEST_INCLUDES = \
-	test/test.h\
+	test/dissected_cube.h\
+	test/funcs_to_test.h\
 	test/icosahedron.h\
-	test/dissected_cube.h
+	test/test.h
 

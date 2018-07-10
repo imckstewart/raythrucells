@@ -1,29 +1,80 @@
-
 #include "raythrucells.h"
+
+/*....................................................................*/
+void __attribute__((weak))
+rtcError(int errCode, char *message){
+  printf("Error: %s\n", message);
+  exit(1);
+}
+
+/*....................................................................*/
+void gramSchmidt(const int numDims, const int numAxes\
+  , double rawAxes[numAxes][numDims],  double orthoAxes[numAxes][numDims]){
+  /*
+This performs a Gram-Schmidt orthogonalisation, using the numerically stable algorithm.
+
+*** NOTE *** that numAxes must be <= numDims <= N_DIMS. This is NOT tested for here, neither are parallel axes, or axes of zero length.
+  */
+  int i,j,di;
+  double dotValue,oneOnSelfDotValues[numAxes],oneOnRootNorm;
+
+  for(i=0;i<numAxes;i++){
+    for(di=0;di<numDims;di++)
+      orthoAxes[i][di] = rawAxes[i][di];
+
+    for(j=0;j<i;j++){
+      dotValue = calcDotProduct(numDims, orthoAxes[i], orthoAxes[j]);
+      for(di=0;di<numDims;di++)
+        orthoAxes[i][di] -= dotValue*orthoAxes[j][di]*oneOnSelfDotValues[j];
+    }
+
+    oneOnSelfDotValues[i] = 1.0/calcDotProduct(numDims, orthoAxes[i], orthoAxes[i]);
+    /* Better hope the dot product is never ==0 */
+  }
+
+  for(i=0;i<numAxes;i++){
+    oneOnRootNorm = sqrt(oneOnSelfDotValues[i]);
+    for(di=0;di<numDims;di++)
+      orthoAxes[i][di] *= oneOnRootNorm;
+  }
+}
+
+/*....................................................................*/
+double calcDotProduct(const int numDims, double *vecA, double *vecB){
+  double dotProduct = 0.0;
+  int di;
+
+  for(di=0;di<numDims;di++)
+    dotProduct += vecA[di]*vecB[di];
+
+return dotProduct;
+}
 
 /*....................................................................*/
 void
 calcCellCentres(const int numDims, const unsigned long numCells\
-  , double *vertexCoords, struct simplex *dc){
+  , double *vertexCoords, struct simplex *cells){
 
   unsigned long i,vi,vvi;
   int j,k;
+  const int numVertices=numDims+1;
+  const double normifier=1.0/(double)numVertices;
 
   for(i=0;i<numCells;i++){
     for(j=0;j<numDims;j++){
-      dc[i].centre[j] = 0.0;
-      for(k=0;k<numDims+1;k++){
-        vi = dc[i].vertx[k];
+      cells[i].centre[j] = 0.0;
+      for(k=0;k<numVertices;k++){
+        vi = cells[i].vertx[k];
         vvi = numDims*vi + j;
-        dc[i].centre[j] += vertexCoords[vvi];
+        cells[i].centre[j] += vertexCoords[vvi];
       }
-      dc[i].centre[j] /= (double)(numDims+1);
+      cells[i].centre[j] *= normifier;
     }
   }
 }
 
 /*....................................................................*/
-_Bool getNextEdgeSet(const int numDims, const int numNeigh, _Bool *start\
+_Bool _getNextEdgeSet(const int numDims, const int numNeigh, _Bool *start\
   , int neighSet[numDims]){
   /*
 Example: suppose numDims=3 and numNeigh=5. If start, successive invocations of the routine will write the following to neighSet:
@@ -79,19 +130,9 @@ return FALSE;
 return finished;
 }
 
-void
-_printNeighSet(const int numDims, int neighSet[numDims]){
-  int di;
-
-  printf("[");
-  for(di=0;di<numDims-1;di++)
-    printf("%2d, ", neighSet[di]);
-  printf("%2d]\n", neighSet[numDims-1]);
-}
-
 /*....................................................................*/
 _Bool
-gridPointsAreNeighbours(const int numDims, struct gridPoint *gpA, struct gridPoint *gpB){
+_gridPointsAreNeighbours(const int numDims, struct gridPoint *gpA, struct gridPoint *gpB){
   int i;
 
   for(i=0;i<gpA->numNeigh;i++){
@@ -103,7 +144,7 @@ return FALSE;
 
 /*....................................................................*/
 _Bool
-edgesFormACell(const int numDims, struct gridPoint *gp, int neighSet[numDims]){
+_edgesFormACell(const int numDims, struct gridPoint *gp, int neighSet[numDims]){
   /*
 We have here a list neighSet of numDims edges, all of which contain grid point *gp as one of their vertices. I.e. these are lines which radiate out from *gp. The present function determines whether these edges form part of a single simplex. For this to be true, each pair of grid points defined by neighSet should all be neighbours of each other.
   */
@@ -111,7 +152,7 @@ We have here a list neighSet of numDims edges, all of which contain grid point *
 
   for(di=0;di<numDims-1;di++){
     for(dj=di+1;dj<numDims;dj++){
-      if(!gridPointsAreNeighbours(numDims, gp->neigh[neighSet[di]], gp->neigh[neighSet[dj]]))
+      if(!_gridPointsAreNeighbours(numDims, gp->neigh[neighSet[di]], gp->neigh[neighSet[dj]]))
 return FALSE;
     }
   }
@@ -120,7 +161,11 @@ return TRUE;
 
 /*....................................................................*/
 _Bool
-cellVerticesMatch(const int numDims, struct simplex *cellA, struct simplex *cellB){
+_cellVerticesMatch(const int numDims, struct simplex *cellA, struct simplex *cellB){
+  /*
+If two cells have the same set of vertices (regardless of how these are ordered), they must, geometrically, be the same cell.
+  */
+
   int di,dj;
   _Bool idFound;
 
@@ -142,8 +187,8 @@ return TRUE;
 
 /*....................................................................*/
 void
-addRawCell(const int numDims, struct simplex *candidateCell\
-  , struct simplex **cells, int *maxNumCells, int *numCells){
+_addRawCell(const int numDims, struct simplex *candidateCell\
+  , struct simplex **cells, unsigned long *maxNumCells, unsigned long *numCells){
   /*
 The purpose of this is to check that the combination of vertices in *pps[1:numDims+1] is not present in any cell in the list *cells. If the set of vertices is found unique, it is stored as a new cell.
   */
@@ -152,8 +197,7 @@ The purpose of this is to check that the combination of vertices in *pps[1:numDi
   _Bool cellAlreadyFound = FALSE; /* default */
 
   for(i=0;i<*numCells;i++){
-
-    if(cellVerticesMatch(numDims, &(*cells)[i], candidateCell)){
+    if(_cellVerticesMatch(numDims, &(*cells)[i], candidateCell)){
       cellAlreadyFound = TRUE;
   break;
     }
@@ -177,30 +221,6 @@ The purpose of this is to check that the combination of vertices in *pps[1:numDi
 
 /*....................................................................*/
 void
-_printCellInfo(const int numDims, const unsigned long iul, struct simplex cell){
-  int i;
-
-  printf("Cell %2lu:\n  vertx=[", iul);
-  for(i=0;i<numDims;i++){
-    printf("%2lu, ", cell.vertx[i]);
-  }
-  i = numDims;
-  printf("%2lu]\n  neigh=[", cell.vertx[i]);
-  for(i=0;i<numDims;i++){
-    if(cell.neigh[i]==NULL)
-      printf(" -, ");
-    else
-      printf("%2lu, ", cell.neigh[i]->id);
-  }
-  i = numDims;
-  if(cell.neigh[i]==NULL)
-    printf(" -]\n");
-  else
-    printf("%2lu]\n", cell.neigh[i]->id);
-}
-
-/*....................................................................*/
-void
 getCellsFromGrid(const int numDims, struct gridPoint *gp, const unsigned long numPoints\
   , struct simplex **cells, unsigned long *numCells){
 
@@ -212,8 +232,8 @@ We want here to construct the set of simplicial (i.e. tetrahedral in 3 spatial d
 Note that we do *not* fill in sensible values of 'edges' or 'centre' for the cells.
   */
 
-  unsigned long maxNumCells,iul,jul;
-  int maxNumRawCellsThisPoint,numRawCellsThisPoint,i,di,dj,numCommonVertices;
+  unsigned long maxNumCells,iul,jul,kul,maxNumRawCellsThisPoint,numRawCellsThisPoint;
+  int di,dj,numCommonVertices;
   struct simplex *cellsThisPoint=NULL,candidateCell;
   _Bool start,finished,*rawCellMatched=NULL;
   _Bool jMatches[numDims+1],vertexIsCommon;
@@ -233,32 +253,33 @@ Note that we do *not* fill in sensible values of 'edges' or 'centre' for the cel
     */
     start = TRUE;
     while(TRUE){ /* loop over the combinations of N unique neighbours. */
-      finished = getNextEdgeSet(numDims, gp[iul].numNeigh, &start, neighSet);
+      finished = _getNextEdgeSet(numDims, gp[iul].numNeigh, &start, neighSet);
       if(finished)
     break;
 
-      if(edgesFormACell(numDims, &gp[iul], neighSet)){
+      if(_edgesFormACell(numDims, &gp[iul], neighSet)){
+        candidateCell = init_simplex();
         candidateCell.vertx[0] = gp[iul].id;
         for(di=0;di<numDims;di++)
           candidateCell.vertx[di+1] = gp[iul].neigh[neighSet[di]]->id;
 
-        addRawCell(numDims, &candidateCell, &cellsThisPoint, &maxNumRawCellsThisPoint, &numRawCellsThisPoint);
+        _addRawCell(numDims, &candidateCell, &cellsThisPoint, &maxNumRawCellsThisPoint, &numRawCellsThisPoint);
       }
     } /* end loop over combinations of N unique neighbours. */
 
     /* Compare each of the cellsThisPoint with the cell list.
     */
     rawCellMatched = malloc(sizeof(*rawCellMatched)*numRawCellsThisPoint);
-    for(i=0;i<numRawCellsThisPoint;i++)
-      rawCellMatched[i] = FALSE; /* default */
+    for(jul=0;jul<numRawCellsThisPoint;jul++)
+      rawCellMatched[jul] = FALSE; /* default */
 
     for(jul=0;jul<*numCells;jul++){
-      for(i=0;i<numRawCellsThisPoint;i++){
-        if(rawCellMatched[i])
+      for(kul=0;kul<numRawCellsThisPoint;kul++){
+        if(rawCellMatched[kul])
       continue;
 
-        if(cellVerticesMatch(numDims, &cellsThisPoint[i], &(*cells)[jul])){
-          rawCellMatched[i] = TRUE;
+        if(_cellVerticesMatch(numDims, &cellsThisPoint[kul], &(*cells)[jul])){
+          rawCellMatched[kul] = TRUE;
       break;
         }
       } /* loop over cells around this grid point */
@@ -266,8 +287,8 @@ Note that we do *not* fill in sensible values of 'edges' or 'centre' for the cel
 
     /* Add unmatched grid cells to main list.
     */
-    for(i=0;i<numRawCellsThisPoint;i++){
-      if(rawCellMatched[i])
+    for(jul=0;jul<numRawCellsThisPoint;jul++){
+      if(rawCellMatched[jul])
     continue;
 
       (*numCells)++;
@@ -278,9 +299,9 @@ Note that we do *not* fill in sensible values of 'edges' or 'centre' for the cel
 
       for(di=0;di<numDims+1;di++){
         (*cells)[*numCells-1].id = *numCells-1;
-        (*cells)[*numCells-1].vertx[di] = cellsThisPoint[i].vertx[di];
+        (*cells)[*numCells-1].vertx[di] = cellsThisPoint[jul].vertx[di];
         (*cells)[*numCells-1].neigh[di] = NULL;
-//*** should really zero 'edges' and 'centre'.
+//*** should really also set to zero 'edges' and 'centre'.
       }
     }
 
@@ -377,8 +398,91 @@ getEdges(const int numDims, struct simplex *cells, const unsigned long numCells\
 
   *edges = realloc(*edges, sizeof(**edges)*tallyOfEdges);
   *numEdges = tallyOfEdges;
+}
 
-printf("In raythrucells.getEdges(). There are %d edges.\n", (int)tallyOfEdges);
+/*....................................................................*/
+void
+calcBaryCoords(const int numDims, double vertices[numDims+1][numDims]\
+  , double *x, double *bary){
+  /*
+In an N-dimensional space, the final N barycentric coordinates L_ = {L_1,L_2,...,L_N} of a point x_ inside a simplex with N+1 vertices r_0_ to r_N_ are given by
+
+	T L_ = x_ - r_0_
+
+where T is an N*N matrix with entries
+
+	T_{i,j} = r_j+1[i] - r_0[i].
+
+
+The 0th barycentric coordinate, L_0, is given by
+
+	         __N
+	         \
+	L_0 = 1 - >    L_i.
+	         /_i=1
+
+See the Wikipedia article on barycentric coordinates for further information.
+
+The pointer x must be malloc'd to >= sizeof(*x)*numDims and bary must be malloc'd to >= sizeof(*bary)*(numDims+1).
+  */
+  int i,j;
+  double tMat[numDims][numDims],bVec[numDims],det;
+  char errStr[RTC_MSG_STR_LEN];
+
+  if(numDims==1 || numDims==2){
+    for(i=0;i<numDims;i++){
+      for(j=0;j<numDims;j++)
+        tMat[i][j] = vertices[j+1][i] - vertices[0][i];
+      bVec[i] = x[i] - vertices[0][i];
+    }
+
+    if(numDims==1)
+      bary[1] = bVec[0]/tMat[0][0];
+
+    else{ /* numDims==2 */
+      det = tMat[0][0]*tMat[1][1] - tMat[0][1]*tMat[1][0];
+      /*** We're assuming that the simplex (a triangle in the present case) is not pathological, i.e that det!=0. */
+      bary[1] = ( tMat[1][1]*bVec[0] - tMat[0][1]*bVec[1])/det;
+      bary[2] = (-tMat[1][0]*bVec[0] + tMat[0][0]*bVec[1])/det;
+    }
+
+  }else{ /* Assume numDims>2 */
+    int dummySignum,status=0;
+    gsl_matrix *gslT = gsl_matrix_alloc(numDims, numDims);
+    gsl_vector *gsl_x = gsl_vector_alloc(numDims);
+    gsl_vector *gsl_b = gsl_vector_alloc(numDims);
+    gsl_permutation *p = gsl_permutation_alloc(numDims);
+
+    for(i=0;i<numDims;i++){
+      for(j=0;j<numDims;j++)
+        gsl_matrix_set(gslT, i, j, vertices[j+1][i] - vertices[0][i]);
+      gsl_vector_set(gsl_b, i, x[i] - vertices[0][i]);
+    }
+
+    status = gsl_linalg_LU_decomp(gslT,p,&dummySignum);
+    if(status){
+      snprintf(errStr, RTC_MSG_STR_LEN, "LU decomposition failed (GSL error %d).", status);
+      rtcError(RTC_ERR_LU_DECOMP_FAIL, errStr);
+    }
+
+    status = gsl_linalg_LU_solve(gslT,p,gsl_b,gsl_x);
+    if(status){
+      snprintf(errStr, RTC_MSG_STR_LEN, "LU solver failed (GSL error %d).", status);
+      rtcError(RTC_ERR_LU_SOLVE_FAIL, errStr);
+    }
+
+    for(i=0;i<numDims;i++)
+      bary[i+1] = gsl_vector_get(gsl_x,i);
+
+    gsl_permutation_free(p);
+    gsl_vector_free(gsl_b);
+    gsl_vector_free(gsl_x);
+    gsl_matrix_free(gslT);
+  }
+
+  bary[0] = 1.0;
+  for(i=1;i<numDims+1;i++)
+    bary[0] -= bary[i];
 }
 
 

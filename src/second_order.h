@@ -1,12 +1,14 @@
-#ifndef MESHTOCUBE_H
-#define MESHTOCUBE_H
+#ifndef SECOND_ORDER_H
+#define SECOND_ORDER_H
 
 #include <stdio.h>
 #include <math.h>
-#include <gsl/gsl_interp.h>
 
 #include "dims.h" /* Should define the macro N_DIMS which specifies the number of spatial dimensions. Note that this is a _maximum_ value, the actual value 'numDims' which is passed via the function interfaces may be <= N_DIMS. */
 #include "rtc_types.h"
+
+#define SCO_ERR_TOO_MANY_VERT	1
+#define SCO_ERR_BAD_CI		2
 
 #ifndef TRUE
 #define TRUE                   (_Bool)1
@@ -17,12 +19,10 @@
 #endif
 
 
+void	interpOnGridAlongRay2ndOrder(baryBuffType *baryBuff, double *vertexValues\
+  , double *midEdgeValues, struct simplex *cells, const double deltaX\
+  , cellChainType *cellChain, const int numXi, rasterType *raster\
+  , double *rasterValues);
 
-int	cellsToHyperCube(const int numDims, double *vertexCoords\
-  , double *vertexValues, struct simplex *dc, const unsigned long numCells\
-  , const double epsilon, faceType **facePtrs[N_DIMS+1], axisType axes[N_DIMS]\
-  , const int numElementsPerVertex, double *midEdgeValues\
-  , double **hypercube);
-
-#endif /* MESHTOCUBE_H */
+#endif /* SECOND_ORDER_H */
 

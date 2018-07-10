@@ -2,6 +2,8 @@
 #include <fitsio.h>
 #define STR_LEN_0	127
 
+_Bool doTest_wf = TRUE;
+
 /*....................................................................*/
 void
 _writeWCS(fitsfile *fptr, const int i, int axesOrder[4], float cdelt[4]\
@@ -50,6 +52,8 @@ write3Dfits(char *fileName, double *cube, const int sizes[3], double xLos[3], do
   long int fpixels[numAxes],lpixels[numAxes];
   char negfile[100]="! ";
   unsigned long ppi;
+
+const int testXi=0,testYi=1,testZi=0;
 
   row = malloc(sizeof(*row)*sizes[0]);
 
@@ -105,6 +109,9 @@ write3Dfits(char *fileName, double *cube, const int sizes[3], double xLos[3], do
       for(xi=0;xi<sizes[0];xi++){
         ppi = flattenImageIndices(sizes, xi, yi, zi);
         row[xi] = (float)cube[ppi];
+if(doTest_wf && xi==testXi && yi==testYi && zi==testZi){
+  printf("In write_fits.write3Dfits(). Hypercube flat index at [%d,%d,%d] is %lu\n", testXi, testYi, testZi, ppi);
+}
       }
       fpixels[axesOrder[0]] = 1;
       fpixels[axesOrder[1]] = yi+1;
@@ -113,6 +120,9 @@ write3Dfits(char *fileName, double *cube, const int sizes[3], double xLos[3], do
       lpixels[axesOrder[1]] = yi+1;
       lpixels[axesOrder[2]] = zi+1;
 
+if(doTest_wf && zi==testZi && yi==testYi){
+  printf("  ...Value at [%d,%d,%d] is %e\n", testXi, testYi, testZi, row[testXi]);
+}
       fits_write_subset(fptr, TFLOAT, fpixels, lpixels, row, &status);
     }
   }
