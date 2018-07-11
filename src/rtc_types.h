@@ -3,9 +3,6 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-//#include <math.h>
-//#include <gsl/gsl_matrix.h>
-//#include <gsl/gsl_linalg.h>
 
 #include "dims.h" /* Should define the macro N_DIMS which specifies the number of spatial dimensions. Note that this is a _maximum_ value, the actual value 'numDims' which is passed via the function interfaces may be <= N_DIMS. */
 

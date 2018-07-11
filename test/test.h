@@ -115,11 +115,11 @@ void	_addRawCell(const int numDims, struct simplex *candidateCell, struct simple
 
 // Declarations of normally private functions in raythrucells:
 faceType	_extractFace(const int numDims, double *vertexCoords, struct simplex *dc, const unsigned long dci, const int fi);
-int	_getNewEntryFaceI(const int numDims, const unsigned long dci, const struct simplex newCell);
-facePlusBasisType _calcFaceInNMinus1(const int numDims, const int numVertices, faceType *face);
+int	_getNewEntryFaceI(const int numDims, const unsigned long dci, const struct simplex *newCell);
+//facePlusBasisType _calcFaceInNMinus1_old(const int numDims, const int numVertices, faceType *face);
+facePlusBasisType _calcFaceInNMinus1(const int numDims, faceType *face);
 intersectType _intersectLineWithFace(const int numDims, double *x, double *dir, faceType *face\
   , const double epsilon);
-
 _Bool	_followGoodChain(const int numDims, double *x, double *dir\
   , struct simplex *cells, unsigned long dci, int cellEntryFaceI\
   , const double epsilon, faceType **facePtrs[numDims+1]\
@@ -132,14 +132,14 @@ int	_buildRayCellChain(const int numDims, double *x, double *dir\
   , _Bool **cellVisited, cellChainType *cellChain);
 
 // Declarations of normally private functions in meshtocube:
-void	_interpolateAtFace(const int numCellVertices, intersectType intercept\
-  , double *vertexValues, struct simplex *cell\
-  , double *values, const int numElementsPerVertex);
-void	_getFaceInterpsAlongRay(const int numDims, double *vertexValues, struct simplex *cells, cellChainType *cellChain\
-  , double *faceInterpValues, double *faceDistValues, const int numElementsPerVertex);
-void	_interpOnGridAlongRay(const int numDims, double *vertexValues, struct simplex *cells\
-  , const double deltaX, cellChainType *cellChain, rasterType *raster\
-  , double *rasterValues, const int numXi, const int numElementsPerVertex);
+void	_interpolateAtFace(const int numCellVertices, const int numElementsPerVertex\
+  , intersectType *intercept, double *vertexValues, struct simplex *cell, double *values);
+void	_getFaceInterpsAlongRay(const int numDims, const int numElementsPerVertex\
+  , double *vertexValues, struct simplex *cells, cellChainType *cellChain\
+  , double *faceInterpValues, double *faceDistValues);
+void	_interpOnGridAlongRay(const int numDims, const int numElementsPerVertex\
+  , double *vertexValues, struct simplex *cells, cellChainType *cellChain\
+  , const double deltaX, const int numXi, rasterType *raster, double *rasterValues);
 unsigned long	_generateVoxelIndex(const int numDims, axisType axes[N_DIMS], int *pxi);
 _Bool	_generateNextPixelCombo(const int numDims, axisType axes[N_DIMS], int *pxi\
   , unsigned long *ppi);

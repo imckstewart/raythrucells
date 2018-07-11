@@ -17,12 +17,10 @@
 #endif
 
 
-
-int	cellsToHyperCube(const int numDims, double *vertexCoords\
-  , double *vertexValues, struct simplex *dc, const unsigned long numCells\
-  , const double epsilon, faceType **facePtrs[N_DIMS+1], axisType axes[N_DIMS]\
-  , const int numElementsPerVertex, double *midEdgeValues\
-  , double **hypercube);
+int	cellsToHyperCube(const int numDims, const int numElementsPerVertex\
+  , double *vertexCoords, double *vertexValues, double *midEdgeValues\
+  , struct simplex *cells, const unsigned long numCells, const double epsilon\
+  , faceType **facePtrs[N_DIMS+1], axisType axes[N_DIMS], double **hypercube);
 
 #endif /* MESHTOCUBE_H */
 

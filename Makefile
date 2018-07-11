@@ -22,7 +22,10 @@ all: mytest
 mytest: ${OBJS}
 	${CC} -o $@ $^ ${LIBS} ${LDFLAGS}  
 
-.PHONY: clean
+.PHONY: clean test
+
+test: mytest
+	test/run_tests.pl
 
 clean:
 	rm -f src/*.o test/*.o *~ src/*~ test/*~ core mytest ./junk*

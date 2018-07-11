@@ -8,7 +8,8 @@
 faceType
 _extractFace(const int numDims, double *vertexCoords, struct simplex *cells\
   , const unsigned long dci, const int fi){
-  /* Given a simplex cells[dci] and the face index (in the range {0...numDims}) fi, this returns the desired information about that face. Note that the ordering of the elements of face.r[] is the same as the ordering of the vertices of the simplex, cells[dci].vertx[]; just the vertex fi is omitted.
+  /*
+Given a simplex cells[dci] and the face index (in the range {0...numDims}) fi, this returns the desired information about that face. Note that the ordering of the elements of face.r[] is the same as the ordering of the vertices of the simplex, cells[dci].vertx[]; just the vertex fi is omitted.
 
 Note that the element 'centre' of the faceType struct is mean to contain the spatial coordinates of the centre of the simplex, not of the face. This is designed to facilitate orientation of the face and thus to help determine whether rays which cross it are entering or exiting the simplex.
  */
@@ -37,16 +38,16 @@ return face;
 
 /*....................................................................*/
 int
-_getNewEntryFaceI(const int numDims, const unsigned long dci, const struct simplex newCell){
+_getNewEntryFaceI(const int numDims, const unsigned long dci, const struct simplex *newCell){
   /* Finds the index of the old cell in the face list of the new cell. */
 
   const int numFaces=numDims+1;
-  _Bool matchFound = 0;
+  _Bool matchFound = FALSE;
   int ffi = 0, newEntryFaceI;
 
-  while(ffi<numFaces && matchFound==0){
-    if(newCell.neigh[ffi]!=NULL && newCell.neigh[ffi]->id==dci){
-      matchFound = 1;
+  while(ffi<numFaces && !matchFound){
+    if(newCell->neigh[ffi]!=NULL && newCell->neigh[ffi]->id==dci){
+      matchFound = TRUE;
       newEntryFaceI = ffi;
     }
     ffi++;
@@ -56,30 +57,28 @@ _getNewEntryFaceI(const int numDims, const unsigned long dci, const struct simpl
   if(!matchFound)
     rtcError(RTC_ERR_OLD_NOT_FOUND, "Cannot find old cell ID in new cell data.");
 
-  return newEntryFaceI;
+return newEntryFaceI;
 }
 
 /*....................................................................*/
 facePlusBasisType
-_calcFaceInNMinus1(const int numDims, const int numVertices, faceType *face){
+_calcFaceInNMinus1(const int numDims, faceType *face){
   /*
-Each of the faces of a polytope in N spatial dimensions is itself a polytope in N-1 dimensions. Each face can therefore be represented via the coordinates of its vertices expressed in an (N-1)-dimensional frame oriented so as to be parallel to the face. The function of the present routine is to perform this decomposition and to return both the (N-1)-dimensional frame (specified via the coordinates in N dimensions of its N-1 basis vectors) and the coordinates in it of each of the M face vertices. (If the face is simplicial, M==N.)
-
-Note that numVertices (a.k.a. M) is expected to be >= numDims (a.k.a. N). The thing would not make much sense otherwise.
+Each of the faces of a simplex in N spatial dimensions is itself a simplex in N-1 dimensions. Each face can therefore be represented via the coordinates of its vertices expressed in an (N-1)-dimensional frame oriented so as to be parallel to the face. The function of the present routine is to perform this decomposition and to return both the (N-1)-dimensional frame (specified via the coordinates in N dimensions of its N-1 basis vectors) and the coordinates in it of each of the N face vertices.
   */
 
   facePlusBasisType facePlusBasis;
-  double edgesMinusOrigin[numVertices-1][numDims],dotValue;
+  double edgesMinusOrigin[numDims-1][numDims],dotValue;
   int di,vi,ddi;
 
   /* The first part of the routine is finding the components in N-space of the N-1 orthonormal axes parallel to the face.
   */
   for(di=0;di<numDims;di++)
-    facePlusBasis.origin[di] = (*face).r[0][di];
+    facePlusBasis.origin[di] = face->r[0][di];
 
-  for(vi=0;vi<numVertices-1;vi++){
+  for(vi=0;vi<numDims-1;vi++){
     for(di=0;di<numDims;di++)
-      edgesMinusOrigin[vi][di] = (*face).r[vi+1][di] - facePlusBasis.origin[di];
+      edgesMinusOrigin[vi][di] = face->r[vi+1][di] - facePlusBasis.origin[di];
   }
 
   gramSchmidt(numDims, numDims-1, edgesMinusOrigin, facePlusBasis.axes);
@@ -90,7 +89,7 @@ Note that numVertices (a.k.a. M) is expected to be >= numDims (a.k.a. N). The th
   for(ddi=0;ddi<numDims-1;ddi++)
     facePlusBasis.r[vi][ddi] = 0.0;
 
-  for(vi=1;vi<numVertices;vi++){
+  for(vi=1;vi<numDims;vi++){
     for(ddi=0;ddi<numDims-1;ddi++){
       dotValue = calcDotProduct(numDims, edgesMinusOrigin[vi-1], facePlusBasis.axes[ddi]);
       facePlusBasis.r[vi][ddi] = dotValue;
@@ -110,7 +109,7 @@ This function calculates the intersection between a line and the face of a simpl
 	px_ = x_ + a*dir_
 
 where px_, x_ and dir_ are vectors and 'a' is a scalar. The routine returns the following information:
-	- The value of 'a'.
+	- The value of 'a' (returned in field 'dist' of the returned intersectType).
 	- The so-called barycentric coordinates (BC) of px_ in the face.
 
 The scalar 'a' is found as follows. We need the additional point y_ which can be any of the face vertices. We state the vector identity
@@ -263,7 +262,7 @@ The GSL doco says that SV_decomp returns sorted svs values, but I prefer not to 
 
   /* In order to calculate the barycentric coordinates, we need to set up a N-1 coordinate basis in the plane of the face.
   */
-  facePlusBasis = _calcFaceInNMinus1(numDims, numDims, face);
+  facePlusBasis = _calcFaceInNMinus1(numDims, face);
 
   /* Now we want to express the intersection point in these coordinates:
   */
@@ -323,29 +322,44 @@ _followGoodChain(const int numDims, double *x, double *dir\
   , const double epsilon, faceType **facePtrs[numDims+1]\
   , double *vertexCoords, _Bool **cellVisited, cellChainType *cellChain\
   , intersectType marginalExitIntcpts[numDims+1], int *numMarginalExits){
-
   /*
-Returns TRUE if the chain terminated at the edge of the set of cells, following only good interceptions.
+We're following a ray through a set of cells. The end aim is to produce several lists (stored in the struct 'cellChain') pertaining to the N cells the ray passes through. We want a list of the N cell IDs and a list of the N+1 intercepts between the ray and each of the cell faces it encounters.
+
+The present function follows the ray through a succession of cells only so long as the decision about which next cell is entered remains unambiguous - or, until the far edge of the set is encountered. (There's at present no provision for non-convex sets.)
+
+The function returns TRUE if the chain terminated at the edge of the set of cells, following only good interceptions.
 
 Input arguments:
-	numDims
-	x
-	dir
-	cells
-	dci
-	cellEntryFaceI
-	epsilon
-	facePtrs
-	vertexCoords
+================
+	- numDims: the number of spatial dimensions.
 
-In/out arguments:
-	cellVisited
-	cellChain
+	- x: the nominal origin of the ray.
+
+	- dir: a unit vector giving the direction of propagation of the ray.
+
+	- cells: a list of all the cells in the connected set.
+
+	- dci: at entry to the function, this is the ID of the first cell the function will process. The function changes its value, but since it is a variable with only local scope, the changed value is not returned.
+
+	- cellEntryFaceI: at entry to the function, this gives the index (in the range [0,numDims]) of the entry face in the list of faces of the entry cell. The function changes its value, but since it is a variable with only local scope, the changed value is not returned.
+
+	- epsilon: a small value.
+
+	- facePtrs: contains information about the spatial locations of all vertices in the set of cells. Either this or vertexCoords can be NULL. See explanation in followRayThroughCells().
+
+	- vertexCoords: contains information about the spatial locations of all vertices in the set of cells. Either this or facePtrs can be NULL. See explanation in followRayThroughCells().
+
+Input/output arguments:
+=======================
+	- cellVisited: self-explanatory.
+
+	- cellChain: this contains information about the cells which are traversed by the ray.
 
 Output arguments:
-	marginalExitIntcpts
-	numMarginalExits
+=================
+	- marginalExitIntcpts: this is a list of intercepts between the ray and all of the faces of the last cell processed, with the proviso that the ray must be exiting the cell, and that the ID of the new cell is ambiguous (as can happen in numerical geometry).
 
+	- numMarginalExits: size of marginalExitIntcpts.
   */
 
   const int numFaces=numDims+1;
@@ -419,7 +433,7 @@ return FALSE;
 return TRUE;
     }
 
-    cellEntryFaceI = _getNewEntryFaceI(numDims, dci, *(cells[dci].neigh[exitFi]));
+    cellEntryFaceI = _getNewEntryFaceI(numDims, dci, cells[dci].neigh[exitFi]);
     dci = cells[dci].neigh[exitFi]->id;
   };
 }
@@ -454,6 +468,8 @@ The function terminates under the following conditions:
 		* one of these has been successful (returns success).
 
 At a successful termination, therefore, details of all the cells to the edge of the model are correctly stored in chainOfCellIds and cellExitIntcpts, and the number of these cells is returned in lenChainPtrs.
+
+The arguments are the same as those of _followGoodChain().
 
 ***** Note that it is assumed here that a mis-indentification of the actual cell traversed by a ray in marginal cases will not ultimately matter to the external calling routine, provided that the ray-face intersection points are sufficiently close to the boundary between the cells in question. This is only reasonable if whatever function or property is being sampled by the ray does not vary in a stepwise manner at any cell boundary. *****
   */
@@ -490,7 +506,7 @@ return RTC_ERR_BAD_CHAIN; /* Unsuccessful end of this chain. */
       status = 0;
 
     }else{
-      newEntryFaceI = _getNewEntryFaceI(numDims, lastGoodCellId, *(cells[lastGoodCellId].neigh[exitFi]));
+      newEntryFaceI = _getNewEntryFaceI(numDims, lastGoodCellId, cells[lastGoodCellId].neigh[exitFi]);
 
       /* Now we dive into the branch: */
       status = _buildRayCellChain(numDims, x, dir, cells\
@@ -534,7 +550,7 @@ The function arguments:
     Outputs:
     --------
 	cellChain: contains the following fields of present interest:
-		entryIntcpt: this gives the location where the ray (extended backward beyond its given starting point if necessary) first enters the mesh of cells. ***NOTE*** that since it is a scalar, non-convex meshes will not be handled correctly.
+		entryIntcpt: this gives the location where the ray (extended backward beyond its given starting point if necessary) first enters the mesh of cells. ***NOTE*** that since it is a scalar, non-convex meshes, for which several points of entry are possible, will not be handled correctly.
 
 		cellIds: this is a list, in order, of the cells traversed by the ray from its first entry to its exit from the mesh of cells.
 
@@ -567,7 +583,6 @@ and filled as
 	for(i=0;i<numPoints;i++)
 	  for(j=0;j<numDims;j++)
 	    vertexCoords[numDims*i+j] = // grid point i, coordinate j
-
 
   */
 

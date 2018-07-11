@@ -14,15 +14,27 @@ In the comments in this module, N is short for numDims, the actual number of spa
 
 /*....................................................................*/
 void
-_interpolateAtFace(const int numCellVertices, intersectType intercept\
-  , double *vertexValues, struct simplex *cell\
-  , double *returnedValues, const int numElementsPerVertex){
+_interpolateAtFace(const int numCellVertices, const int numElementsPerVertex\
+  , intersectType *intercept, double *vertexValues, struct simplex *cell\
+  , double *returnedValues){
   /*
 Given a simplical cell in N dimensions, with values defined for each of the N+1 vertices, and a ray which passes through the cell, the present function uses (barycentric) linear interpolation to calculate the interpolated value(s) at either the entry or exit point of the ray.
 
-*** Required malloc sizes of pointers: ***
-  - vertexValues: >=M*numElementsPerVertex, where M is the total number of points (the maximum value of cell->vertx for all cells).
-  - returnedValues: numElementsPerVertex.
+Input arguments:
+================
+	- numCellVertices: as it says.
+
+	- numElementsPerVertex: as it says.
+
+	- intercept: pointer to the struct which contains the necessary information about the point of intersection between the ray and the cell face.
+
+	- vertexValues: this contains the values (which may be vector quantities) at all the vertices in the set of cells.
+
+	- cell: pointer to the struct which contains configurational information about the cell in question.
+
+Output arguments:
+=================
+	- returnedValues: must be malloc'd to size 'numElementsPerVertex' beforehand.
   */
   int faceVi,cellVi,ei;
   unsigned long gi,ggi;
@@ -34,11 +46,11 @@ Given a simplical cell in N dimensions, with values defined for each of the N+1 
 
   faceVi = 0;
   for(cellVi=0;cellVi<numCellVertices;cellVi++){
-    if(cellVi!=intercept.fi){
+    if(cellVi!=intercept->fi){
       gi = cell->vertx[cellVi];
       for(ei=0;ei<numElementsPerVertex;ei++){
         ggi = gi*numElementsPerVertex + ei;
-        returnedValues[ei] += vertexValues[ggi]*intercept.bary[faceVi];
+        returnedValues[ei] += vertexValues[ggi]*intercept->bary[faceVi];
       }
       faceVi++;
     }
@@ -47,15 +59,29 @@ Given a simplical cell in N dimensions, with values defined for each of the N+1 
 
 /*....................................................................*/
 void
-_getFaceInterpsAlongRay(const int numDims, double *vertexValues, struct simplex *cells\
-  , cellChainType *cellChain\
-  , double *faceInterpValues, double *faceDistValues, const int numElementsPerVertex){
+_getFaceInterpsAlongRay(const int numDims, const int numElementsPerVertex\
+  , double *vertexValues, struct simplex *cells, cellChainType *cellChain\
+  , double *faceInterpValues, double *faceDistValues){
   /*
-The ray passes through M cells (where M is short for the input argument 'lenChainPtrs'). The M+1 face intercepts are already stored in the arguments 'entryIntcpt' plus the length-M list 'exitIntcpts'. The task of the present routine is twofold: (i) (for convenience) to return in 'faceDistValues' the 'dist' scalars, i.e. the distance along the ray from its origin to the point of face interception, for all M+1 face intercepts; (ii) to return in 'faceInterpValues' the M+1 values interpolated from the vertices of each intercepted face.
+The ray passes through M cells (where M is short for the input argument 'cellChain.nCellsInChain'). The M+1 face intercepts are already stored in the arguments 'cellChain.entryIntcpt' plus the length-M list 'cellChain.exitIntcpts'. The task of the present routine is twofold: (i) (for convenience) to return in 'faceDistValues' the 'dist' scalars, i.e. the distance along the ray from its origin to the point of face interception, for each of the M+1 face intercepts; (ii) to return in 'faceInterpValues' the M+1 values interpolated from the vertices of each intercepted face.
 
-The pointers 'faceInterpValues' and 'faceDistValues' are expected to be malloc'd before the function is called, to the following sizes:
-  - faceInterpValues: >=(M+1)*numElementsPerVertex.
-  - faceDistValues: M+1.
+Input arguments:
+================
+	- numDims: as it says.
+
+	- numElementsPerVertex: as it says.
+
+	- vertexValues: this contains the values (which may be vector quantities) at all the vertices in the set of cells.
+
+	- cells: a list of structs, each of which contains configurational information about one of the cells in the set.
+
+	- cellChain: pointer to a struct which contains the cell IDs and information about the face intercepts along the path of the ray.
+
+Output arguments:
+=================
+	- faceInterpValues: expected to be malloc'd to size (cellChain.nCellsInChain+1)*numElementsPerVertex beforehand.
+
+	- faceDistValues: expected to be malloc'd to size (cellChain.nCellsInChain+1) beforehand.
   */
 
   const int numCellVertices=numDims+1;
@@ -68,14 +94,14 @@ The pointers 'faceInterpValues' and 'faceDistValues' are expected to be malloc'd
   i = 0;
   faceDistValues[i] = cellChain->entryIntcpt.dist;
   dci = cellChain->cellIds[i];
-  _interpolateAtFace(numCellVertices, cellChain->entryIntcpt, vertexValues, &cells[dci], interpValuesThisFace, numElementsPerVertex);
+  _interpolateAtFace(numCellVertices, numElementsPerVertex, &cellChain->entryIntcpt, vertexValues, &cells[dci], interpValuesThisFace);
   for(ei=0;ei<numElementsPerVertex;ei++)
     faceInterpValues[i*numElementsPerVertex+ei] = interpValuesThisFace[ei];
 
   for(i=1;i<=cellChain->nCellsInChain;i++){
     faceDistValues[i] = cellChain->exitIntcpts[i-1].dist;
     dci = cellChain->cellIds[i-1];
-    _interpolateAtFace(numCellVertices, cellChain->exitIntcpts[i-1], vertexValues, &cells[dci], interpValuesThisFace, numElementsPerVertex);
+    _interpolateAtFace(numCellVertices, numElementsPerVertex, &cellChain->exitIntcpts[i-1], vertexValues, &cells[dci], interpValuesThisFace);
     for(ei=0;ei<numElementsPerVertex;ei++)
       faceInterpValues[i*numElementsPerVertex+ei] = interpValuesThisFace[ei];
   }
@@ -85,9 +111,9 @@ The pointers 'faceInterpValues' and 'faceDistValues' are expected to be malloc'd
 
 /*....................................................................*/
 void
-_interpOnGridAlongRay(const int numDims, double *vertexValues, struct simplex *cells\
-  , const double deltaX, cellChainType *cellChain, rasterType *raster\
-  , double *rasterValues, const int numXi, const int numElementsPerVertex){
+_interpOnGridAlongRay(const int numDims, const int numElementsPerVertex\
+  , double *vertexValues, struct simplex *cells, cellChainType *cellChain\
+  , const double deltaX, const int numXi, rasterType *raster, double *rasterValues){
   /*
 Given the cell-barycentric coordinates L_ of a point x_ within a simplicial cell, plus the values of some function Y at the vertices, a linear interpolation to estimate Y(x_) is given by
 
@@ -98,14 +124,29 @@ Given the cell-barycentric coordinates L_ of a point x_ within a simplicial cell
 
 Here N is the number of spatial dimensions; a simplex in such a space has N+1 vertices. In the present case however since we already know the face-barycentric coordinates (i.e. in 1 fewer dimensions) in the cell faces for the entry and exit points, we can easily obtain the Y values for these two points, then interpolate simply along the line segment between them.
 
-We calculate here the interpolated values for an evenly-spaced sequence of locations along the ray. The coordinate, which we label 'x', is distance along the ray from its origin. The face intercept objects supplied in the arguments entryIntcptFirstCell and cellExitIntcpts already record the value of this coordinate at each intercept point. The number of samples is supplied in argument 'numXi' and their spacing by 'deltaX'.
+We calculate here the interpolated values for an evenly-spaced sequence of locations along the ray (returned in 'rasterValues'). The coordinate, which we label 'x', is distance along the ray from its origin. The face intercept objects supplied in the arguments entryIntcptFirstCell and cellExitIntcpts already record the value of this coordinate at each intercept point. The number of samples is supplied in argument 'numXi' and their spacing by 'deltaX'.
 
-*** Required malloc sizes of pointers: ***
-  - vertexValues: >=N*numElementsPerVertex, where N is the total number of points (the maximum value of cell->vertx for all cells).
-  - cells: >= the maximum value in chainOfCellIds.
-  - chainOfCellIds, cellExitIntcpts: lenChainPtrs
-  - raster: numXi
-  - rasterValues: numXi*numElementsPerVertex
+Input arguments:
+================
+	- numDims: as it says.
+
+	- numElementsPerVertex: as it says.
+
+	- vertexValues: this contains the values (which may be vector quantities) at all the vertices in the set of cells.
+
+	- cells: a list of structs, each of which contains configurational information about one of the cells in the set.
+
+	- cellChain: pointer to a struct which contains the cell IDs and information about the face intercepts along the path of the ray.
+
+	- deltaX: the spacing of the samples.
+
+	- numXi: required number of samples along the ray.
+
+Output arguments:
+=================
+	- raster: must have been malloc'd beforehand to size numXi. Contains the index (in the lists cellChain->cellIds etc) of the cell each sample falls within, plus a flag to indicate whether it falls within one at all.
+
+	- rasterValues: must have been malloc'd beforehand to size numXi*numElementsPerVertex. Contains the interpolated values.
   */
 
   double *faceInterpValues=NULL,*faceDistValues=NULL;
@@ -116,7 +157,8 @@ We calculate here the interpolated values for an evenly-spaced sequence of locat
   faceInterpValues = malloc(sizeof(*faceInterpValues)*(cellChain->nCellsInChain+1)*numElementsPerVertex);
   faceDistValues   = malloc(sizeof(  *faceDistValues)*(cellChain->nCellsInChain+1));
 
-  _getFaceInterpsAlongRay(numDims, vertexValues, cells, cellChain, faceInterpValues, faceDistValues, numElementsPerVertex);
+  _getFaceInterpsAlongRay(numDims, numElementsPerVertex\
+    , vertexValues, cells, cellChain, faceInterpValues, faceDistValues);
 
   acc = gsl_interp_accel_alloc();
 
@@ -208,17 +250,43 @@ return isFinished;
 
 /*....................................................................*/
 int
-cellsToHyperCube(const int numDims, double *vertexCoords\
-  , double *vertexValues, struct simplex *cells, const unsigned long numCells\
-  , const double epsilon, faceType **facePtrs[N_DIMS+1], axisType axes[N_DIMS]\
-  , const int numElementsPerVertex, double *midEdgeValues\
-  , double **hypercube){
+cellsToHyperCube(const int numDims, const int numElementsPerVertex\
+  , double *vertexCoords, double *vertexValues, double *midEdgeValues\
+  , struct simplex *cells, const unsigned long numCells, const double epsilon\
+  , faceType **facePtrs[N_DIMS+1], axisType axes[N_DIMS], double **hypercube){
   /*
 This function takes as input a connected mesh of simplicial cells defined by the arguments 'cells' and 'vertexValues' and returns a hypercube (i.e. an orthogonal array in the 'numDims' number of spatial dimensions) of interpolated samples. The mesh vertices, and therefore the returned samples, may be either scalar- or vector-valued, as indicated by the input argument 'numElementsPerVertex'.
 
 The samples are taken at equally-spaced points along a set of N-1 rays which are aligned with the zeroth spatial axis.
 
-The calling routine should free *hypercube after use.
+The calling routine should free hypercube after use.
+
+Input arguments:
+================
+	- numDims: as it says.
+
+	- numElementsPerVertex: as it says.
+
+	- vertexCoords: contains information about the spatial locations of all vertices in the set of cells. Either this or facePtrs can be NULL. See explanation in raythrucells.followRayThroughCells().
+
+	- vertexValues: this contains the values (which may be vector quantities) at all the vertices in the set of cells.
+
+	- midEdgeValues: this contains the values (which may be vector quantities) at the midpoint of all the edges in the set of cells. Note that these values are required for 2nd-order interpolation; NULL can be supplied for this argument if only 1st-order interpolation is required.
+
+	- cells: a list of structs, each of which contains configurational information about one of the cells in the set.
+
+	- numCells: size of 'cells'.
+
+	- epsilon: a small value.
+
+	- facePtrs: contains information about the spatial locations of all vertices in the set of cells. Either this or vertexCoords can be NULL. See explanation in raythrucells.followRayThroughCells().
+
+	- axes: this is a list of structs, one for each spatial dimension, each of which gives information about the number of samples in that spatial direction as well as the sample origin and spacing.
+
+Output arguments:
+=================
+	- hypercube: this is malloc'd within the present function to the size of 'numElementsPerVertex' times the product of the numbers of samples given in 'axes'. 'hypercube' is returned as a flat (i.e. 1-dimensional) array for convenience; to access the [i,j,...,n]th sample, it is recommended to make use of _generateVoxelIndex() to generate the index.
+
 
 Below is a code snippet showing an example of how to call this function:
 
@@ -251,10 +319,6 @@ Below is a code snippet showing an example of how to call this function:
   free(cells);
   free(vertexCoords);
 
-
-
-*** Required malloc sizes of input pointers: ***
-  - midEdgeValues: >=M*numElementsPerVertex, where M is the total number of edges (the maximum value of cell->edges for all cells).
   */
 
   int status=0,di,subPlanePxi[numDims-1],rtcStatus=0,xi,ei;
@@ -323,19 +387,18 @@ return rtcStatus;
 
 #ifdef WITH2ORDER
     if(midEdgeValues==NULL){
-      _interpOnGridAlongRay(numDims, vertexValues, cells, axes[fixedAxisI].delta\
-        , &cellChain\
-        , raster, rasterValues, axes[fixedAxisI].numPixels, numElementsPerVertex);
+      _interpOnGridAlongRay(numDims, numElementsPerVertex, vertexValues\
+        , cells, &cellChain, axes[fixedAxisI].delta, axes[fixedAxisI].numPixels\
+        , raster, rasterValues);
 
-
-    }else
+   }else
       interpOnGridAlongRay2ndOrder(vertexValues, cells, axes[fixedAxisI].delta\
         , &cellChain\
         , raster, rasterValues, axes[fixedAxisI].numPixels, baryBuff, midEdgeValues);
 #else
-    _interpOnGridAlongRay(numDims, vertexValues, cells, axes[fixedAxisI].delta\
-      , &cellChain\
-      , raster, rasterValues, axes[fixedAxisI].numPixels, numElementsPerVertex);
+    _interpOnGridAlongRay(numDims, numElementsPerVertex, vertexValues\
+      , cells, &cellChain, axes[fixedAxisI].delta, axes[fixedAxisI].numPixels\
+      , raster, rasterValues);
 #endif
 
     for(xi=0;xi<axes[fixedAxisI].numPixels;xi++){

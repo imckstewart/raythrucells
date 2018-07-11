@@ -8,19 +8,19 @@ int main(int argc, char *argv[]) {
   int status=0;
   int moduleI=0,functionI=0;
 
-  if(argc<3){
+  if(argc!=3){
     printf("Useage: ./mytest <name of module> <name of function>\n");
 return 1;
   }
 
   if(!getModuleI(argv[1], &moduleI)){
     printf("Module %s not found.\n", argv[1]);
-return 3;
+return 2;
   }
 
   if(!getFunctionI(argv[2], moduleI, &functionI)){
     printf("Function %s of module %s not found.\n", argv[2], argv[1]);
-return 4;
+return 3;
   }
 
   if(moduleI==MOD_RT_UTILS){
@@ -70,7 +70,7 @@ return 4;
         break;
 
       default:
-        status = 5;
+        status = 4;
     }
 
   }else if(moduleI==MOD_RAYTHRUCELLS){
@@ -104,7 +104,7 @@ return 4;
         break;
 
       default:
-        status = 5;
+        status = 4;
     }
 
   }else if(moduleI==MOD_MESHTOCUBE){
@@ -134,7 +134,7 @@ return 4;
         break;
 
       default:
-        status = 5;
+        status = 4;
     }
 
   }else if(moduleI==MOD_SECOND_ORDER){
@@ -176,11 +176,9 @@ return 4;
         break;
 
       default:
-        status = 5;
+        status = 4;
     }
   }
-
-  printf("Status return %d\n", status);
 
 return status;
 }

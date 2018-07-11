@@ -561,7 +561,7 @@ int check_getNewEntryFaceI(void){
   getExampleCells(&numDims, &numElements, &cells, &numCells, &edges\
     , &numEdges, &vertexCoords, &vertexValues, &gps, &numVertices);
 
-  newEntryFaceI = _getNewEntryFaceI(numDims, dci, cells[1]);
+  newEntryFaceI = _getNewEntryFaceI(numDims, dci, &cells[1]);
 
   if(newEntryFaceI != expectedEntryFaceI){
     printf("Returned face ID of old cell %d should equal %d\n", newEntryFaceI, expectedEntryFaceI);
@@ -582,7 +582,7 @@ int check_calcFaceInNMinus1(void){
   /* All the numerical values chosen here are arbitrary. */
   int status=0,di,i;
   facePlusBasisType facePlusBasis;
-  const int numDims=3,numVertices=3;
+  const int numDims=3;
   faceType face;
   double axes[N_DIMS-1][N_DIMS],r[N_DIMS][N_DIMS-1],origin[N_DIMS],tempAxis[N_DIMS];
   double dotProduct,vecLength;
@@ -650,13 +650,13 @@ return 2;
 
   /* Construct the face vertex coordinates:
   */
-  for(i=0;i<numVertices;i++){
+  for(i=0;i<numDims;i++){
     for(di=0;di<numDims;di++){
       face.r[i][di] = origin[di] + r[i][0]*axes[0][di] + r[i][1]*axes[1][di];
     }
   }
 
-  facePlusBasis = _calcFaceInNMinus1(numDims, numVertices, &face);
+  facePlusBasis = _calcFaceInNMinus1(numDims, &face);
 
   if(verbose){
     for(i=0;i<2;i++){
@@ -683,7 +683,7 @@ return 4;
     }
   }
 
-  for(i=0;i<numVertices;i++){
+  for(i=0;i<numDims;i++){
     for(di=0;di<numDims-1;di++){
       if(!valuesAreClose(facePlusBasis.r[i][di], r[i][di], 10.0)){
         printf("Vertex %d coord %d is %f, expected to be %f.\n", i, di, facePlusBasis.r[i][di], r[i][di]);
@@ -1018,7 +1018,7 @@ int check_interpolateAtFace(void){
 
   values = malloc(sizeof(*values)*1);
 
-  _interpolateAtFace(numCellVertices, intercept, vertexValues, &cell, values, 1);
+  _interpolateAtFace(numCellVertices, 1, &intercept, vertexValues, &cell, values);
 
   /* Returned value should be equal to:
   */
@@ -1060,8 +1060,8 @@ int check_getFaceInterpsAlongRay(void){
   faceInterpValues = malloc(sizeof(*faceInterpValues)*(cellChain.nCellsInChain+1)*numElements);
   faceDistValues   = malloc(sizeof(  *faceDistValues)*(cellChain.nCellsInChain+1));
 
-  _getFaceInterpsAlongRay(numDims, vertexValues, cells\
-    , &cellChain, faceInterpValues, faceDistValues, numElements);
+  _getFaceInterpsAlongRay(numDims, numElements, vertexValues, cells\
+    , &cellChain, faceInterpValues, faceDistValues);
 
   /* Just check the first and last values.
   */
@@ -1149,8 +1149,8 @@ int check_interpOnGridAlongRay(void){
   raster       = malloc(sizeof(*raster)*numSamples);
   rasterValues = malloc(sizeof(*raster)*numSamples);
 
-  _interpOnGridAlongRay(numDims, vertexValues, cells, deltaX, &cellChain, raster\
-    , rasterValues, numSamples, numElements);
+  _interpOnGridAlongRay(numDims, numElements, vertexValues, cells\
+    , &cellChain, deltaX, numSamples, raster, rasterValues);
 
   /* Ok first let's check that the flagging is sort of ok. I'll find the expected start and end samples and look at their flags and those of their next-outer samples.
   */
@@ -1195,11 +1195,11 @@ int check_interpOnGridAlongRay(void){
       finisIntcpt = cellChain.exitIntcpts[si  ];
     }
 
-    _interpolateAtFace(numDims+1, startIntcpt, vertexValues, &cells[dci]\
-      , startValues, numElements);
+    _interpolateAtFace(numDims+1, numElements, &startIntcpt, vertexValues, &cells[dci]\
+      , startValues);
 
-    _interpolateAtFace(numDims+1, finisIntcpt, vertexValues, &cells[dci]\
-      , finisValues, numElements);
+    _interpolateAtFace(numDims+1, numElements, &finisIntcpt, vertexValues, &cells[dci]\
+      , finisValues);
 
     fracDist = (startXi*deltaX - startIntcpt.dist)/(finisIntcpt.dist - startIntcpt.dist);
 
@@ -1406,8 +1406,8 @@ exit(1);
     axes[di].origin = 0.5*axes[di].delta;
   }
 
-  status = cellsToHyperCube(numDims, vertexCoords, vertexValues, cells, numCells\
-    , epsilon, NULL, axes, 1, NULL, &hypercube);
+  status = cellsToHyperCube(numDims, 1, vertexCoords, vertexValues, NULL, cells, numCells\
+    , epsilon, NULL, axes, &hypercube);
 
   /* Load and plot a single ray from the hypercube: */
   ray = malloc(sizeof(*ray)*axes[2].numPixels);
